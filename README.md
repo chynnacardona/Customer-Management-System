@@ -11,9 +11,12 @@
 
 ## Installation
 1. Clone the repository:
-   git clone <repo-url>
 
-2. Go into the project folder:
+   ```bash
+   git clone <repo-url>
+   ```
+   
+3. Go into the project folder:
    
    ```bash
    cd Customer-Management-System
