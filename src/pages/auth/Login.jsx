@@ -203,7 +203,7 @@ function Login() {
         <div className="apple-card relative z-10 w-full mx-4 p-8" style={{ maxWidth: '380px' }}>
 
           <div className="text-center mb-7">
-            <h1 className="text-2xl font-semibold text-white tracking-wide mb-1">HOPE SMS</h1>
+            <h1 className="text-2xl font-semibold text-white tracking-wide mb-1">Ano i-title ko dito?</h1>
             <p className="text-xs" style={{ color: 'rgba(180, 210, 255, 0.35)' }}>
               Sign in to your account
             </p>
