@@ -49,7 +49,10 @@
    ```
 
 ## Running Tests
+
+  ```bash
    npm test
+  ```
 
 ## Branch & PR Rules
 - NEVER push directly to main or dev
