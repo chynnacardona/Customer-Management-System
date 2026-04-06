@@ -1,6 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 
 function Login() {
+  const [searchParams] = useSearchParams();
+
+useEffect(() => {
+  const urlError = searchParams.get('error');
+  if (urlError === 'inactive') {
+    setError('Your account is disabled. Please contact your administrator.');
+  } else if (urlError === 'account_not_found') {
+    setError('Account not found. Please register first.');
+  }
+}, [searchParams]);
+
+const handleGoogleLogin = async () => {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    },
+  });
+
+  if (error) setError(error.message);
+};
   const canvasRef = useRef(null)
   const [showPassword, setShowPassword] = useState(false)
 
@@ -262,7 +285,7 @@ function Login() {
             <div className="flex-grow h-px" style={{ background: 'rgba(100,160,255,0.08)' }} />
           </div>
 
-          <button className="google-btn">
+          <button className="google-btn" onClick={handleGoogleLogin}>
             <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-4 h-4" />
             Sign in with Google
           </button>
