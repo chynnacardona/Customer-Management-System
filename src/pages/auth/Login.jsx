@@ -1,18 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 function Login() {
+  const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
 
 useEffect(() => {
-  const urlError = searchParams.get('error');
-  if (urlError === 'inactive') {
-    setError('Your account is disabled. Please contact your administrator.');
-  } else if (urlError === 'account_not_found') {
-    setError('Account not found. Please register first.');
-  }
-}, [searchParams]);
+    const urlError = searchParams.get('error');
+    if (urlError === 'inactive') {
+      setError('Your account is disabled. Please contact your administrator.');
+    } else if (urlError === 'account_not_found') {
+      setError('Account not found. Please register first.');
+    }
+  }, [searchParams]);
 
 const handleGoogleLogin = async () => {
   const { error } = await supabase.auth.signInWithOAuth({
@@ -231,6 +232,12 @@ const handleGoogleLogin = async () => {
               Sign in to your account
             </p>
           </div>
+
+          {error && (
+            <div className="mb-4 p-2 rounded text-center text-xs" style={{ background: 'rgba(255, 50, 50, 0.1)', border: '1px solid rgba(255, 50, 50, 0.3)', color: '#ff8080' }}>
+              {error}
+            </div>
+          )}
 
           {/* Email */}
           <div className="input-wrap mb-3">
