@@ -1,59 +1,70 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ParticlesBg from '../../components/layout/ParticlesBg'; 
 
 const AuthCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Ang callback page ay ginagamit para i-process ang auth token.
-    // Pansamantala, naka-simulate ito na mag-lo-load ng 2 seconds tapos pupunta sa login or dashboard.
-    const timeout = setTimeout(() => {
+    const timer = setTimeout(() => {
       navigate('/login');
     }, 2000);
-
-    return () => clearTimeout(timeout);
+    return () => clearTimeout(timer);
   }, [navigate]);
 
   return (
     <div style={styles.container}>
-      <div style={styles.spinner}></div>
-      <h2 style={styles.title}>Verifying account...</h2>
-      <p style={styles.subtitle}>Please wait while we set things up for you.</p>
+      {/* 1. Eto yung Stars at Fog animation*/}
+      <ParticlesBg />
+
+      {/* 2. Eto yung Glassmorphism box sa ibabaw */}
+      <div style={styles.loaderBox}>
+        <div style={styles.spinner}></div>
+        <p style={styles.text}>Verifying account...</p>
+      </div>
     </div>
   );
 };
 
 const styles = {
   container: {
-    height: '100vh',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'transparent', 
-    fontFamily: 'sans-serif',
+    height: '100vh',
+    width: '100vw',
+    position: 'relative',
+    overflow: 'hidden',
+    background: 'linear-gradient(160deg, #020818 0%, #051030 50%, #060d28 100%)',
+  },
+  loaderBox: {
+    zIndex: 10, 
+    padding: '40px',
+    background: 'rgba(8, 18, 40, 0.85)',
+    backdropFilter: 'blur(30px)',
+    borderRadius: '22px',
+    border: '1px solid rgba(100, 160, 255, 0.12)',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.7)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '20px',
   },
   spinner: {
     width: '50px',
     height: '50px',
     border: '3px solid rgba(100, 160, 255, 0.1)',
-    borderTop: '3px solid #64a0ff',
+    borderTop: '3px solid #7eb8ff',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
-    marginBottom: '20px',
-    boxShadow: '0 0 15px rgba(100, 160, 255, 0.3)',
   },
-  title: {
-    color: '#ffffff',
-    fontSize: '20px',
-    fontWeight: '600',
-    marginBottom: '8px',
-    letterSpacing: '0.5px',
-  },
-  subtitle: {
-    color: 'rgba(180, 210, 255, 0.5)',
+  text: {
     fontSize: '14px',
-  },
+    fontWeight: '500',
+    color: 'white',
+    letterSpacing: '0.1em',
+  }
 };
 
 export default AuthCallback;
