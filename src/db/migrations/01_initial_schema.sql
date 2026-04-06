@@ -1,11 +1,84 @@
--- Create table Customer
-CREATE TABLE customer (custno VARCHAR(5) NOT NULL PRIMARY KEY, 
-											   custname VARCHAR(20), 
-											   address VARCHAR(50), 
-											   payterm VARCHAR(3) CONSTRAINT pay_ck 
-											   CHECK (payterm IN ('COD', '30D', '45D'))) 
-                                               record_status VARCHAR(10) DEFAULT 'active', 
-                                               created_at TIMESTAMPTZ DEFAULT NOW();
+DROP TABLE IF EXISTS salesDetail;
+DROP TABLE IF EXISTS priceHist;
+DROP TABLE IF EXISTS sales;
+DROP TABLE IF EXISTS product;
+DROP TABLE IF EXISTS customer;
+
+-- 1. Create Product First (Parent)
+CREATE TABLE product (
+    prodCode VARCHAR(6) NOT NULL PRIMARY KEY, 
+    description VARCHAR(30), 
+    unit VARCHAR(3) CONSTRAINT unit_ck CHECK (unit IN ('pc','ea','mtr','pkg','ltr'))
+);
+
+-- Insert rows PRODUCT
+INSERT INTO product VALUES('AD0001','Toshiba Canvio 1 TB', 'ea');
+INSERT INTO product VALUES('AD0002','WD Ultra 1TB ', 'ea');
+INSERT INTO product VALUES('AD0003','Seagate Bracuda 1TB ', 'ea');
+INSERT INTO product VALUES('AD0004','Transcend 1 TB ', 'ea');
+INSERT INTO product VALUES('AK0001','HP Pavilion DV6000', 'pc');
+INSERT INTO product VALUES('AK0002','Micro Innovations Kb', 'pc');
+INSERT INTO product VALUES('AK0003','Steel APEX GAMING KB', 'pc');
+INSERT INTO product VALUES('AM0001','MS Wireless Mouse', 'pc');
+INSERT INTO product VALUES('AM0002','LOGITECH 910-002696', 'pc');
+INSERT INTO product VALUES('AM0003','IMICRO KB-IM8911U', 'pc');
+INSERT INTO product VALUES('AM0004','STEEL Rival Mouse', 'pc');
+INSERT INTO product VALUES('AM0005','Logitech M500 USB', 'pc');
+INSERT INTO product VALUES('AP0001','HDMI Pocket Proj', 'pc');
+INSERT INTO product VALUES('AP0002','InFocus IN112 Proj', 'pc');
+INSERT INTO product VALUES('AP0003','ViewSonic Projector', 'pc');
+INSERT INTO product VALUES('MD0001','ASUS VS228H-P 22-In', 'ea');
+INSERT INTO product VALUES('MD0002','ViewSonic VA2446M', 'ea');
+INSERT INTO product VALUES('MD0003','Dell UltrShrp U2412M', 'ea');
+INSERT INTO product VALUES('MD0004','Acer S231HL BBID 23', 'ea');
+INSERT INTO product VALUES('MD0005','Apple Dsplay MC914', 'ea');
+INSERT INTO product VALUES('MD0006','Asus VE228H 21.5', 'ea');
+INSERT INTO product VALUES('MP0001','Apple iPhone 4 16GB ', 'ea');
+INSERT INTO product VALUES('MP0002','Apple iPhone 3G', 'ea');
+INSERT INTO product VALUES('MP0003','SAMSUNG GALAXY S4 ', 'ea');
+INSERT INTO product VALUES('MP0004','SAMSUNG GALAXY S3', 'ea');
+INSERT INTO product VALUES('NB0001','Dell Inspiron Laptop', 'ea');
+INSERT INTO product VALUES('NB0002','ASUS Tformer Book', 'ea');
+INSERT INTO product VALUES('NB0003','Acer C720 Chrome', 'ea');
+INSERT INTO product VALUES('NB0004','HP Chromebook 11', 'ea');
+INSERT INTO product VALUES('NB0005','Apple Mac Pro Laptop', 'ea');
+INSERT INTO product VALUES('NH0001','NETGEAR ProSAFE 5-Port ', 'pc');
+INSERT INTO product VALUES('NH0002','TP-LINK  1000Mbps', 'pc');
+INSERT INTO product VALUES('NH0003','Cisco 24-P G Switch ', 'pc');
+INSERT INTO product VALUES('NT0001','Apple iPad Retna 16G', 'ea');
+INSERT INTO product VALUES('NT0002','Apple iPad 2 MC769LL', 'ea');
+INSERT INTO product VALUES('NT0003','Apple iPad Mini ', 'ea');
+INSERT INTO product VALUES('NT0004','Samsung Galaxy Tab3 ', 'ea');
+INSERT INTO product VALUES('NT0005','Samsung Glaxy Tab32G', 'ea');
+INSERT INTO product VALUES('NT0006','DrgonTouch 7B 2Core ', 'ea');
+INSERT INTO product VALUES('PA0001','MS Ofc Business 2013', 'ea');
+INSERT INTO product VALUES('PA0002','Office Mac Home 2011', 'ea');
+INSERT INTO product VALUES('PC0001','CyberpowerPC Gamer', 'ea');
+INSERT INTO product VALUES('PC0002','Dell 745 Opti Desk', 'ea');
+INSERT INTO product VALUES('PC0003','Dell Inspiron Desk', 'ea');
+INSERT INTO product VALUES('PC0004','Dell Inspiron 660', 'ea');
+INSERT INTO product VALUES('PF0001','Win7 Pro SP1 64bit ', 'ea');
+INSERT INTO product VALUES('PF0002','Win7 Home Pre SP1 64', 'ea');
+INSERT INTO product VALUES('PF0003','Mac OS X ver 10.6.3', 'ea');
+INSERT INTO product VALUES('PF0004','Windows 8.1 64-Bit ', 'ea');
+INSERT INTO product VALUES('PF0005','Windows 8 Pro ', 'ea');
+INSERT INTO product VALUES('PF0006','RED HAT Prof Edition', 'ea');
+INSERT INTO product VALUES('PR0001','Epson Expression ', 'pc');
+INSERT INTO product VALUES('PR0002','Canon PIXMA MX922 ', 'pc');
+INSERT INTO product VALUES('PR0003','HP Envy 4500 Wireles', 'pc');
+INSERT INTO product VALUES('PS0001','VirServ 12Core 128GB', 'pc');
+INSERT INTO product VALUES('PS0002','Ms WinServer 2012', 'pc');
+INSERT INTO product VALUES('PS0003','Cisco Virt Hardware', 'pc');
+
+-- 2. Create Customer (Parent)
+CREATE TABLE customer (
+    custno VARCHAR(5) NOT NULL PRIMARY KEY, 
+    custname VARCHAR(50), 
+    address VARCHAR(100),
+    payterm VARCHAR(3) CONSTRAINT pay_ck CHECK (payterm IN ('COD', '30D', '45D')), 
+    record_status VARCHAR(10) DEFAULT 'active', 
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 -- Insert customer records
 INSERT INTO customer VALUES('C0001','Globus Medical, Inc', '2560 Gen Armistead Ave Audubon CA 94031', '30D');
@@ -91,14 +164,101 @@ INSERT INTO customer VALUES('C0080','Social Sec Admn CA', '3836 Wilshire Blvd, L
 INSERT INTO customer VALUES('C0081','Dept Food and Agri', '220 N Street Sacramento, CA 95814', '45D');
 INSERT INTO customer VALUES('C0082','California Dept Tech', '1325 J St Suite 1600 Sacramento CA 95814', '45D');
 
+-- 3. Create PriceHist (Child of Product)
+CREATE TABLE priceHist (
+    effDate DATE NOT NULL, 
+    prodCode VARCHAR(6) NOT NULL REFERENCES product(prodCode), 
+    unitPrice DECIMAL(10,2) CONSTRAINT unitP_ck CHECK (unitPrice > 0),  
+    PRIMARY KEY (effDate, prodCode) -- Removed the extra comma that was here
+);
 
--- Create sales
-CREATE TABLE  sales (transNo VARCHAR(8) NOT NULL PRIMARY KEY, 
-												salesDate DATE, 
-												custNo VARCHAR(5), 
-												empNo VARCHAR(5), 	
-												FOREIGN KEY (custNo) REFERENCES customer, 
-												FOREIGN KEY (empno) REFERENCES employee);
+--  Insert PRICEHIST rows 
+INSERT INTO priceHist VALUES('2010-05-15','AK0001', 12);
+INSERT INTO priceHist VALUES('2010-05-15','AK0002', 8.37);
+INSERT INTO priceHist VALUES('2010-05-15','AK0003', 99.99);
+INSERT INTO priceHist VALUES('2010-05-15','AM0001', 36.45);
+INSERT INTO priceHist VALUES('2010-05-15','AM0002', 69.26);
+INSERT INTO priceHist VALUES('2010-05-15','AM0003', 20.43);
+INSERT INTO priceHist VALUES('2010-05-15','AM0004', 88.14);
+INSERT INTO priceHist VALUES('2010-05-15','AM0005', 49.27);
+INSERT INTO priceHist VALUES('2010-05-15','AP0001', 299.99);
+INSERT INTO priceHist VALUES('2010-05-15','AP0002', 304.48);
+INSERT INTO priceHist VALUES('2010-05-15','AP0003', 349.99);
+INSERT INTO priceHist VALUES('2010-05-15','MD0001', 119.68);
+INSERT INTO priceHist VALUES('2010-05-15','MD0002', 149.99);
+INSERT INTO priceHist VALUES('2010-05-15','MD0003', 239.96);
+INSERT INTO priceHist VALUES('2010-05-15','MD0004', 132.21);
+INSERT INTO priceHist VALUES('2010-05-15','MD0005', 825);
+INSERT INTO priceHist VALUES('2010-05-15','MD0006', 124.29);
+INSERT INTO priceHist VALUES('2010-05-15','NB0001', 300);
+INSERT INTO priceHist VALUES('2010-05-15','NB0002', 298);
+INSERT INTO priceHist VALUES('2010-05-15','NB0003', 199);
+INSERT INTO priceHist VALUES('2010-05-15','NB0004', 279);
+INSERT INTO priceHist VALUES('2010-05-15','PA0001', 219);
+INSERT INTO priceHist VALUES('2010-05-15','PA0002', 102.99);
+INSERT INTO priceHist VALUES('2010-07-12','PC0001', 454.54);
+INSERT INTO priceHist VALUES('2010-05-15','PC0001', 499.99);
+INSERT INTO priceHist VALUES('2010-07-12','PC0002', 197.99);
+INSERT INTO priceHist VALUES('2010-05-15','PC0002', 179.99);
+INSERT INTO priceHist VALUES('2010-05-15','PC0003', 390);
+INSERT INTO priceHist VALUES('2010-05-15','PC0004', 538);
+INSERT INTO priceHist VALUES('2010-05-15','PF0001', 123.75);
+INSERT INTO priceHist VALUES('2010-05-15','PF0002', 64.25);
+INSERT INTO priceHist VALUES('2010-05-15','PF0003', 28.87);
+INSERT INTO priceHist VALUES('2010-05-15','PF0004', 92.85);
+INSERT INTO priceHist VALUES('2010-05-15','PF0005', 119);
+INSERT INTO priceHist VALUES('2010-05-15','PF0006', 7.5);
+INSERT INTO priceHist VALUES('2010-05-15','PR0001', 81.72);
+INSERT INTO priceHist VALUES('2010-05-15','PR0002', 99.99);
+INSERT INTO priceHist VALUES('2010-05-15','PR0003', 123);
+INSERT INTO priceHist VALUES('2010-08-01','MD0001', 131.65);
+INSERT INTO priceHist VALUES('2010-08-01','MD0002', 164.99);
+INSERT INTO priceHist VALUES('2010-08-01','MD0003', 263.96);
+INSERT INTO priceHist VALUES('2010-08-01','MD0004', 145.43);
+INSERT INTO priceHist VALUES('2010-08-01','MD0005', 907.5);
+INSERT INTO priceHist VALUES('2010-08-01','MD0006', 136.72);
+INSERT INTO priceHist VALUES('2010-08-16','PF0001', 112.5);
+INSERT INTO priceHist VALUES('2010-08-16','PF0002', 58.41);
+INSERT INTO priceHist VALUES('2010-08-16','PF0003', 26.25);
+INSERT INTO priceHist VALUES('2010-08-16','PF0004', 84.41);
+INSERT INTO priceHist VALUES('2010-08-16','PF0005', 108.18);
+INSERT INTO priceHist VALUES('2010-08-16','PF0006', 6.82);
+INSERT INTO priceHist VALUES('2010-08-16','AM0001', 38.27);
+INSERT INTO priceHist VALUES('2010-08-16','AM0002', 72.72);
+INSERT INTO priceHist VALUES('2010-08-16','AM0003', 21.45);
+INSERT INTO priceHist VALUES('2010-08-16','AM0004', 92.55);
+INSERT INTO priceHist VALUES('2010-08-16','AM0005', 51.73);
+INSERT INTO priceHist VALUES('2010-08-16','AP0001', 314.99);
+INSERT INTO priceHist VALUES('2010-08-16','AP0002', 319.7);
+INSERT INTO priceHist VALUES('2010-08-16','AP0003', 367.49);
+INSERT INTO priceHist VALUES('2010-08-16','AD0001', 58);
+INSERT INTO priceHist VALUES('2010-08-16','AD0002', 69.99);
+INSERT INTO priceHist VALUES('2010-08-16','AD0003', 54.44);
+INSERT INTO priceHist VALUES('2010-08-16','AD0004', 71.99);
+INSERT INTO priceHist VALUES('2010-08-16','NH0001', 21.99);
+INSERT INTO priceHist VALUES('2010-08-16','NH0002', 24.99);
+INSERT INTO priceHist VALUES('2010-08-16','NH0003', 171.69);
+INSERT INTO priceHist VALUES('2010-12-01','NT0001', 412.49);
+INSERT INTO priceHist VALUES('2010-12-01','NT0002', 324.99);
+INSERT INTO priceHist VALUES('2010-12-01','NT0003', 287);
+INSERT INTO priceHist VALUES('2010-12-01','NT0004', 219.89);
+INSERT INTO priceHist VALUES('2010-12-01','NT0005', 499.99);
+INSERT INTO priceHist VALUES('2010-12-01','NT0006', 57.99);
+INSERT INTO priceHist VALUES('2010-12-01','PS0001', 3200);
+INSERT INTO priceHist VALUES('2010-12-01','PS0002', 699.99);
+INSERT INTO priceHist VALUES('2010-12-01','PS0003', 599.99);
+INSERT INTO priceHist VALUES('2010-12-01','MP0001', 199.95);
+INSERT INTO priceHist VALUES('2010-12-01','MP0002', 126.72);
+INSERT INTO priceHist VALUES('2010-12-01','MP0003', 425);
+INSERT INTO priceHist VALUES('2010-12-01','MP0004', 302);
+INSERT INTO priceHist VALUES('2011-02-01','NB0005', 1184.72);
+
+-- 4. Create Sales (Child of Customer)
+CREATE TABLE sales (
+    transNo VARCHAR(8) NOT NULL PRIMARY KEY, 
+    salesDate DATE, 
+    custNo VARCHAR(5) REFERENCES customer(custno) -- Removed the comma and simplified
+);
 
 -- Insert rows sales
 INSERT INTO sales VALUES('TR000001','2010-06-27', 'C0001', '00005');
@@ -226,13 +386,14 @@ INSERT INTO sales VALUES('TR000122','2011-04-12', 'C0080', '00025');
 INSERT INTO sales VALUES('TR000123','2011-04-12', 'C0081', '00019');
 INSERT INTO sales VALUES('TR000124','2011-04-15', 'C0082', '00017');
 
--- Create salesDETAIL
-CREATE TABLE salesDetail (transNo VARCHAR(8) NOT NULL REFERENCES sales, 
-													prodCode VARCHAR(6) NOT NULL REFERENCES product, 
-													quantity DECIMAL(10,2) CONSTRAINT quantity_ck 
-													CHECK (quantity >= 0.0), 
-													PRIMARY KEY (transNo, prodCode));
-													
+-- 5. Create SalesDetail (Child of Sales and Product)
+CREATE TABLE salesDetail (
+    transNo VARCHAR(8) NOT NULL REFERENCES sales(transNo), 
+    prodCode VARCHAR(6) NOT NULL REFERENCES product(prodCode), 
+    quantity DECIMAL(10,2) CONSTRAINT quantity_ck CHECK (quantity >= 0.0), 
+    PRIMARY KEY (transNo, prodCode)
+);
+
 -- Insert salesDETAIL rows 
 INSERT INTO salesDetail VALUES('TR000001','AK0002', 10);
 INSERT INTO salesDetail VALUES('TR000001','AM0003', 10);
@@ -547,156 +708,3 @@ INSERT INTO salesDetail VALUES('TR000124','PC0002', 15);
 INSERT INTO salesDetail VALUES('TR000124','PF0005', 3);
 INSERT INTO salesDetail VALUES('TR000124','PF0006', 2);
 INSERT INTO salesDetail VALUES('TR000124','PS0001', 3);
-
--- Create PRODUCT
-CREATE TABLE product (prodCode VARCHAR(6) NOT NULL PRIMARY KEY, 
-											description VARCHAR(30), 
-											unit VARCHAR(3) CONSTRAINT unit_ck 
-											CHECK (unit IN ('pc','ea','mtr','pkg','ltr')));
--- Insert rows PRODUCT
-INSERT INTO product VALUES('AD0001','Toshiba Canvio 1 TB', 'ea');
-INSERT INTO product VALUES('AD0002','WD Ultra 1TB ', 'ea');
-INSERT INTO product VALUES('AD0003','Seagate Bracuda 1TB ', 'ea');
-INSERT INTO product VALUES('AD0004','Transcend 1 TB ', 'ea');
-INSERT INTO product VALUES('AK0001','HP Pavilion DV6000', 'pc');
-INSERT INTO product VALUES('AK0002','Micro Innovations Kb', 'pc');
-INSERT INTO product VALUES('AK0003','Steel APEX GAMING KB', 'pc');
-INSERT INTO product VALUES('AM0001','MS Wireless Mouse', 'pc');
-INSERT INTO product VALUES('AM0002','LOGITECH 910-002696', 'pc');
-INSERT INTO product VALUES('AM0003','IMICRO KB-IM8911U', 'pc');
-INSERT INTO product VALUES('AM0004','STEEL Rival Mouse', 'pc');
-INSERT INTO product VALUES('AM0005','Logitech M500 USB', 'pc');
-INSERT INTO product VALUES('AP0001','HDMI Pocket Proj', 'pc');
-INSERT INTO product VALUES('AP0002','InFocus IN112 Proj', 'pc');
-INSERT INTO product VALUES('AP0003','ViewSonic Projector', 'pc');
-INSERT INTO product VALUES('MD0001','ASUS VS228H-P 22-In', 'ea');
-INSERT INTO product VALUES('MD0002','ViewSonic VA2446M', 'ea');
-INSERT INTO product VALUES('MD0003','Dell UltrShrp U2412M', 'ea');
-INSERT INTO product VALUES('MD0004','Acer S231HL BBID 23', 'ea');
-INSERT INTO product VALUES('MD0005','Apple Dsplay MC914', 'ea');
-INSERT INTO product VALUES('MD0006','Asus VE228H 21.5', 'ea');
-INSERT INTO product VALUES('MP0001','Apple iPhone 4 16GB ', 'ea');
-INSERT INTO product VALUES('MP0002','Apple iPhone 3G', 'ea');
-INSERT INTO product VALUES('MP0003','SAMSUNG GALAXY S4 ', 'ea');
-INSERT INTO product VALUES('MP0004','SAMSUNG GALAXY S3', 'ea');
-INSERT INTO product VALUES('NB0001','Dell Inspiron Laptop', 'ea');
-INSERT INTO product VALUES('NB0002','ASUS Tformer Book', 'ea');
-INSERT INTO product VALUES('NB0003','Acer C720 Chrome', 'ea');
-INSERT INTO product VALUES('NB0004','HP Chromebook 11', 'ea');
-INSERT INTO product VALUES('NB0005','Apple Mac Pro Laptop', 'ea');
-INSERT INTO product VALUES('NH0001','NETGEAR ProSAFE 5-Port ', 'pc');
-INSERT INTO product VALUES('NH0002','TP-LINK  1000Mbps', 'pc');
-INSERT INTO product VALUES('NH0003','Cisco 24-P G Switch ', 'pc');
-INSERT INTO product VALUES('NT0001','Apple iPad Retna 16G', 'ea');
-INSERT INTO product VALUES('NT0002','Apple iPad 2 MC769LL', 'ea');
-INSERT INTO product VALUES('NT0003','Apple iPad Mini ', 'ea');
-INSERT INTO product VALUES('NT0004','Samsung Galaxy Tab3 ', 'ea');
-INSERT INTO product VALUES('NT0005','Samsung Glaxy Tab32G', 'ea');
-INSERT INTO product VALUES('NT0006','DrgonTouch 7B 2Core ', 'ea');
-INSERT INTO product VALUES('PA0001','MS Ofc Business 2013', 'ea');
-INSERT INTO product VALUES('PA0002','Office Mac Home 2011', 'ea');
-INSERT INTO product VALUES('PC0001','CyberpowerPC Gamer', 'ea');
-INSERT INTO product VALUES('PC0002','Dell 745 Opti Desk', 'ea');
-INSERT INTO product VALUES('PC0003','Dell Inspiron Desk', 'ea');
-INSERT INTO product VALUES('PC0004','Dell Inspiron 660', 'ea');
-INSERT INTO product VALUES('PF0001','Win7 Pro SP1 64bit ', 'ea');
-INSERT INTO product VALUES('PF0002','Win7 Home Pre SP1 64', 'ea');
-INSERT INTO product VALUES('PF0003','Mac OS X ver 10.6.3', 'ea');
-INSERT INTO product VALUES('PF0004','Windows 8.1 64-Bit ', 'ea');
-INSERT INTO product VALUES('PF0005','Windows 8 Pro ', 'ea');
-INSERT INTO product VALUES('PF0006','RED HAT Prof Edition', 'ea');
-INSERT INTO product VALUES('PR0001','Epson Expression ', 'pc');
-INSERT INTO product VALUES('PR0002','Canon PIXMA MX922 ', 'pc');
-INSERT INTO product VALUES('PR0003','HP Envy 4500 Wireles', 'pc');
-INSERT INTO product VALUES('PS0001','VirServ 12Core 128GB', 'pc');
-INSERT INTO product VALUES('PS0002','Ms WinServer 2012', 'pc');
-INSERT INTO product VALUES('PS0003','Cisco Virt Hardware', 'pc');
-
--- Create table PRICEHIST
-CREATE TABLE priceHist (effDate DATE NOT NULL, 
-											   prodCode VARCHAR(6) NOT NULL REFERENCES product, 
-											   unitPrice DECIMAL(10,2) CONSTRAINT unitP_ck 
-											   CHECK (unitPrice > 0),  
-											   PRIMARY KEY (effDate, prodCode));
-
---  Insert PRICEHIST rows 
-INSERT INTO priceHist VALUES('2010-05-15','AK0001', 12);
-INSERT INTO priceHist VALUES('2010-05-15','AK0002', 8.37);
-INSERT INTO priceHist VALUES('2010-05-15','AK0003', 99.99);
-INSERT INTO priceHist VALUES('2010-05-15','AM0001', 36.45);
-INSERT INTO priceHist VALUES('2010-05-15','AM0002', 69.26);
-INSERT INTO priceHist VALUES('2010-05-15','AM0003', 20.43);
-INSERT INTO priceHist VALUES('2010-05-15','AM0004', 88.14);
-INSERT INTO priceHist VALUES('2010-05-15','AM0005', 49.27);
-INSERT INTO priceHist VALUES('2010-05-15','AP0001', 299.99);
-INSERT INTO priceHist VALUES('2010-05-15','AP0002', 304.48);
-INSERT INTO priceHist VALUES('2010-05-15','AP0003', 349.99);
-INSERT INTO priceHist VALUES('2010-05-15','MD0001', 119.68);
-INSERT INTO priceHist VALUES('2010-05-15','MD0002', 149.99);
-INSERT INTO priceHist VALUES('2010-05-15','MD0003', 239.96);
-INSERT INTO priceHist VALUES('2010-05-15','MD0004', 132.21);
-INSERT INTO priceHist VALUES('2010-05-15','MD0005', 825);
-INSERT INTO priceHist VALUES('2010-05-15','MD0006', 124.29);
-INSERT INTO priceHist VALUES('2010-05-15','NB0001', 300);
-INSERT INTO priceHist VALUES('2010-05-15','NB0002', 298);
-INSERT INTO priceHist VALUES('2010-05-15','NB0003', 199);
-INSERT INTO priceHist VALUES('2010-05-15','NB0004', 279);
-INSERT INTO priceHist VALUES('2010-05-15','PA0001', 219);
-INSERT INTO priceHist VALUES('2010-05-15','PA0002', 102.99);
-INSERT INTO priceHist VALUES('2010-07-12','PC0001', 454.54);
-INSERT INTO priceHist VALUES('2010-05-15','PC0001', 499.99);
-INSERT INTO priceHist VALUES('2010-07-12','PC0002', 197.99);
-INSERT INTO priceHist VALUES('2010-05-15','PC0002', 179.99);
-INSERT INTO priceHist VALUES('2010-05-15','PC0003', 390);
-INSERT INTO priceHist VALUES('2010-05-15','PC0004', 538);
-INSERT INTO priceHist VALUES('2010-05-15','PF0001', 123.75);
-INSERT INTO priceHist VALUES('2010-05-15','PF0002', 64.25);
-INSERT INTO priceHist VALUES('2010-05-15','PF0003', 28.87);
-INSERT INTO priceHist VALUES('2010-05-15','PF0004', 92.85);
-INSERT INTO priceHist VALUES('2010-05-15','PF0005', 119);
-INSERT INTO priceHist VALUES('2010-05-15','PF0006', 7.5);
-INSERT INTO priceHist VALUES('2010-05-15','PR0001', 81.72);
-INSERT INTO priceHist VALUES('2010-05-15','PR0002', 99.99);
-INSERT INTO priceHist VALUES('2010-05-15','PR0003', 123);
-INSERT INTO priceHist VALUES('2010-08-01','MD0001', 131.65);
-INSERT INTO priceHist VALUES('2010-08-01','MD0002', 164.99);
-INSERT INTO priceHist VALUES('2010-08-01','MD0003', 263.96);
-INSERT INTO priceHist VALUES('2010-08-01','MD0004', 145.43);
-INSERT INTO priceHist VALUES('2010-08-01','MD0005', 907.5);
-INSERT INTO priceHist VALUES('2010-08-01','MD0006', 136.72);
-INSERT INTO priceHist VALUES('2010-08-16','PF0001', 112.5);
-INSERT INTO priceHist VALUES('2010-08-16','PF0002', 58.41);
-INSERT INTO priceHist VALUES('2010-08-16','PF0003', 26.25);
-INSERT INTO priceHist VALUES('2010-08-16','PF0004', 84.41);
-INSERT INTO priceHist VALUES('2010-08-16','PF0005', 108.18);
-INSERT INTO priceHist VALUES('2010-08-16','PF0006', 6.82);
-INSERT INTO priceHist VALUES('2010-08-16','AM0001', 38.27);
-INSERT INTO priceHist VALUES('2010-08-16','AM0002', 72.72);
-INSERT INTO priceHist VALUES('2010-08-16','AM0003', 21.45);
-INSERT INTO priceHist VALUES('2010-08-16','AM0004', 92.55);
-INSERT INTO priceHist VALUES('2010-08-16','AM0005', 51.73);
-INSERT INTO priceHist VALUES('2010-08-16','AP0001', 314.99);
-INSERT INTO priceHist VALUES('2010-08-16','AP0002', 319.7);
-INSERT INTO priceHist VALUES('2010-08-16','AP0003', 367.49);
-INSERT INTO priceHist VALUES('2010-08-16','AD0001', 58);
-INSERT INTO priceHist VALUES('2010-08-16','AD0002', 69.99);
-INSERT INTO priceHist VALUES('2010-08-16','AD0003', 54.44);
-INSERT INTO priceHist VALUES('2010-08-16','AD0004', 71.99);
-INSERT INTO priceHist VALUES('2010-08-16','NH0001', 21.99);
-INSERT INTO priceHist VALUES('2010-08-16','NH0002', 24.99);
-INSERT INTO priceHist VALUES('2010-08-16','NH0003', 171.69);
-INSERT INTO priceHist VALUES('2010-12-01','NT0001', 412.49);
-INSERT INTO priceHist VALUES('2010-12-01','NT0002', 324.99);
-INSERT INTO priceHist VALUES('2010-12-01','NT0003', 287);
-INSERT INTO priceHist VALUES('2010-12-01','NT0004', 219.89);
-INSERT INTO priceHist VALUES('2010-12-01','NT0005', 499.99);
-INSERT INTO priceHist VALUES('2010-12-01','NT0006', 57.99);
-INSERT INTO priceHist VALUES('2010-12-01','PS0001', 3200);
-INSERT INTO priceHist VALUES('2010-12-01','PS0002', 699.99);
-INSERT INTO priceHist VALUES('2010-12-01','PS0003', 599.99);
-INSERT INTO priceHist VALUES('2010-12-01','MP0001', 199.95);
-INSERT INTO priceHist VALUES('2010-12-01','MP0002', 126.72);
-INSERT INTO priceHist VALUES('2010-12-01','MP0003', 425);
-INSERT INTO priceHist VALUES('2010-12-01','MP0004', 302);
-INSERT INTO priceHist VALUES('2011-02-01','NB0005', 1184.72);
-
