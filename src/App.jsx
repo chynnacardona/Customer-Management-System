@@ -1,3 +1,4 @@
+import { supabase } from '../supabase/supabaseClient'; 
 import { AuthProvider } from './context/AuthContext';
 import { Routes, Route } from 'react-router-dom';
 import Login from './pages/auth/Login';
@@ -11,7 +12,20 @@ function App() {
         <Route path="/register" element={<Register />} />
       </Routes>
     </AuthProvider>
-  );
+  ); 
 }
+
+/* Add this temporary block to your code to test the DB Seeding
+const testConnection = async () => {
+  const { data, error } = await supabase.from('customer').select('*').limit(5);
+  
+  if (error) {
+    console.error("❌ Connection Failed:", error.message);
+  } else {
+    console.log("✅ Success! DB Data found:", data);
+  }
+};*/
+
+testConnection();
 
 export default App;
