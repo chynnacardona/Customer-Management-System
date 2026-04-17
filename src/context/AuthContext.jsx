@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
 
     const { data, error } = await supabase
       .from('user')
-      .select('record_status, role, full_name')
+      .select('user_id, email, full_name, role, status')
       .eq('email', sessionUser.email)
       .single();
 
@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    if (data.record_status === 'INACTIVE') {
+    if (data.status === 'INACTIVE') {
       await supabase.auth.signOut();
       setUser(null);
       alert('Your account is disabled. Please contact your administrator.');
