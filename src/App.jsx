@@ -1,4 +1,3 @@
-import { supabase } from "./supabase/supabaseClient";
 import { AuthProvider } from "./context/AuthContext";
 import { Routes, Route } from 'react-router-dom'
 import Login from './pages/auth/Login'
