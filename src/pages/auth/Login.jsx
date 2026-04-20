@@ -1,22 +1,64 @@
-import { useEffect, useRef, useState } from 'react'
+import { supabase } from "../../supabase/supabaseClient";
+import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useAuth } from "../../context/AuthContext"; 
 
 function Login() {
-  const canvasRef = useRef(null)
-  const [showPassword, setShowPassword] = useState(false)
+  const navigate = useNavigate();
+  const {signOut} = useAuth();
+  const canvasRef = useRef(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setError] = useState("");
+  
+
+  const handleGoogleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) {
+      setError(error.message);
+    }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+    } else {
+      // Success! AuthContext.js will automatically detect 'SIGNED_IN'
+      // and handle the redirect to your dashboard.
+      console.log("Logged in successfully:", data.user.email);
+    }
+  };
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
-    let animationId
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    let animationId;
 
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
     const handleResize = () => {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
-    }
-    window.addEventListener('resize', handleResize)
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    window.addEventListener("resize", handleResize);
 
     const stars = Array.from({ length: 220 }, () => ({
       x: Math.random() * canvas.width,
@@ -24,27 +66,27 @@ function Login() {
       r: Math.random() * 1.3 + 0.2,
       alpha: Math.random(),
       speed: Math.random() * 0.004 + 0.002,
-    }))
+    }));
 
     function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      stars.forEach(s => {
-        s.alpha += s.speed
-        if (s.alpha > 1 || s.alpha < 0) s.speed *= -1
-        ctx.beginPath()
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(180, 210, 255, ${s.alpha * 0.75})`
-        ctx.fill()
-      })
-      animationId = requestAnimationFrame(draw)
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      stars.forEach((s) => {
+        s.alpha += s.speed;
+        if (s.alpha > 1 || s.alpha < 0) s.speed *= -1;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(180, 210, 255, ${s.alpha * 0.75})`;
+        ctx.fill();
+      });
+      animationId = requestAnimationFrame(draw);
     }
 
-    draw()
+    draw();
     return () => {
-      cancelAnimationFrame(animationId)
-      window.removeEventListener('resize', handleResize)
-    }
-  }, [])
+      cancelAnimationFrame(animationId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   return (
     <>
@@ -191,54 +233,110 @@ function Login() {
         .google-btn:active { transform: translateY(0px); }
       `}</style>
 
-      <div style={{ background: 'linear-gradient(160deg, #020818 0%, #051030 50%, #060d28 100%)', minHeight: '100vh', position: 'relative' }}
-        className="flex items-center justify-center overflow-hidden">
-
+      <div
+        style={{
+          background:
+            "linear-gradient(160deg, #020818 0%, #051030 50%, #060d28 100%)",
+          minHeight: "100vh",
+          position: "relative",
+        }}
+        className="flex items-center justify-center overflow-hidden"
+      >
         <canvas ref={canvasRef} className="absolute inset-0 z-0" />
 
-        <div className="absolute inset-0 z-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at 50% 60%, rgba(20, 60, 180, 0.12) 0%, transparent 70%)' }} />
+        <div
+          className="absolute inset-0 z-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse at 50% 60%, rgba(20, 60, 180, 0.12) 0%, transparent 70%)",
+          }}
+        />
 
         {/* Card */}
-        <div className="apple-card relative z-10 w-full mx-4 p-8" style={{ maxWidth: '380px' }}>
-
+        <div
+          className="apple-card relative z-10 w-full mx-4 p-8"
+          style={{ maxWidth: "380px" }}
+        >
           <div className="text-center mb-7">
-            <h1 className="text-2xl font-semibold text-white tracking-wide mb-1">Customer Mangement</h1>
-            <p className="text-xs" style={{ color: 'rgba(180, 210, 255, 0.35)' }}>
+            <h1 className="text-2xl font-semibold text-white tracking-wide mb-1">
+              Customer Mangement
+            </h1>
+            <p
+              className="text-xs"
+              style={{ color: "rgba(180, 210, 255, 0.35)" }}
+            >
               Sign in to your account
             </p>
           </div>
 
           {/* Email */}
           <div className="input-wrap mb-3">
-            <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
-              style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Email</label>
-            <input type="email" placeholder="Enter your email" className="glow-input" />
+            <label
+              className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+              style={{ color: "rgba(180, 210, 255, 0.38)" }}
+            >
+              Email
+            </label>
+
+            <input
+              value={email}
+              className="glow-input mb-1.5"
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="Enter email"
+            />
           </div>
 
           {/* Password */}
           <div className="input-wrap mb-1">
-            <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
-              style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Password</label>
+            <label
+              className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+              style={{ color: "rgba(180, 210, 255, 0.38)" }}
+            >
+              Password
+            </label>
             <div className="input-container">
               <input
-                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
                 className="glow-input mb-1.5"
               />
-              <button className="toggle-btn mb-1.5" onClick={() => setShowPassword(!showPassword)}>
+              <button
+                className="toggle-btn mb-1.5"
+                onClick={() => setShowPassword(!showPassword)}
+              >
                 {showPassword ? (
                   // Eye-off icon
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
                   </svg>
                 ) : (
                   // Eye icon
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
                   </svg>
                 )}
               </button>
@@ -247,36 +345,68 @@ function Login() {
 
           {/* Forgot Password */}
           <div className="flex justify-end mb-5">
-            <a href="/forgot-password"
+            <a
+              href="/forgot-password"
               className="text-xs transition-all hover:opacity-80"
-              style={{ color: '#7eb8ff' }}>
+              style={{ color: "#7eb8ff" }}
+            >
               Forgot password?
             </a>
           </div>
 
-          <button className="sign-in-btn mb-3">Sign In</button>
+          {errorMsg && <p className="text-red-500 text-xs mb-2">{errorMsg}</p>}
+
+          <button
+            className="sign-in-btn mb-3"
+            onClick={handleLogin}
+            disabled={loading}
+          >
+            {loading ? "Verifying..." : "Sign In"}
+          </button>
 
           <div className="flex items-center my-3">
-            <div className="flex-grow h-px" style={{ background: 'rgba(100,160,255,0.08)' }} />
-            <span className="mx-3 text-xs" style={{ color: 'rgba(180,210,255,0.25)' }}>or</span>
-            <div className="flex-grow h-px" style={{ background: 'rgba(100,160,255,0.08)' }} />
+            <div
+              className="flex-grow h-px"
+              style={{ background: "rgba(100,160,255,0.08)" }}
+            />
+            <span
+              className="mx-3 text-xs"
+              style={{ color: "rgba(180,210,255,0.25)" }}
+            >
+              or
+            </span>
+            <div
+              className="flex-grow h-px"
+              style={{ background: "rgba(100,160,255,0.08)" }}
+            />
           </div>
 
-          <button className="google-btn">
-            <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-4 h-4" />
+          <button className="google-btn" onClick={handleGoogleLogin}>
+            <img
+              src="https://www.svgrepo.com/show/475656/google-color.svg"
+              alt="Google"
+              className="w-4 h-4"
+            />
             Sign in with Google
           </button>
 
-          <p className="text-center text-xs mt-5" style={{ color: 'rgba(180,210,255,0.25)' }}>
+          <p
+            className="text-center text-xs mt-5"
+            style={{ color: "rgba(180,210,255,0.25)" }}
+          >
             Don't have an account?{" "}
-            <a href="/register" className="font-medium transition-all hover:opacity-80"
-              style={{ color: '#7eb8ff' }}>Register</a>
+            <a
+              href="/register"
+              className="font-medium transition-all hover:opacity-80"
+              style={{ color: "#7eb8ff" }}
+            >
+              Register
+            </a>
           </p>
-
         </div>
       </div>
     </>
-  )
+  );
 }
 
-export default Login
+export default Login;
