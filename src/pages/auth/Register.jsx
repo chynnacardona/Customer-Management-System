@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from "../../lib/supabase";
 
 function Register() {
   const canvasRef = useRef(null)
+  const navigate = useNavigate()
+
+  // --- States for Form Data ---
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  
+  const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
@@ -46,6 +58,42 @@ function Register() {
       window.removeEventListener('resize', handleResize)
     }
   }, [])
+
+  // --- Registration Logic ---
+  const handleRegister = async (e) => {
+    e.preventDefault()
+    
+    if (password !== confirmPassword) {
+      return alert("Passwords do not match!")
+    }
+
+    setLoading(true)
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            full_name: `${firstName} ${lastName}`,
+          },
+        },
+      })
+
+      if (error) throw error
+
+      if (data) {
+        alert("Registration successful! Please check your email for verification if enabled, or sign in now.")
+        navigate('/login')
+      }
+    } catch (error) {
+      alert(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Eye icon
   const EyeIcon = () => (
@@ -192,15 +240,14 @@ function Register() {
         className="flex items-center justify-center overflow-hidden">
 
         <canvas ref={canvasRef} className="absolute inset-0 z-0" />
-
         <div className="absolute inset-0 z-0 pointer-events-none"
           style={{ background: 'radial-gradient(ellipse at 50% 60%, rgba(20, 60, 180, 0.12) 0%, transparent 70%)' }} />
 
-        {/* Card */}
-        <div className="apple-card relative z-10 w-full mx-4 p-8" style={{ maxWidth: '380px' }}>
+        {/* Card - Wrapped in FORM */}
+        <form onSubmit={handleRegister} className="apple-card relative z-10 w-full mx-4 p-8" style={{ maxWidth: '380px' }}>
 
           <div className="text-center mb-7">
-            <h1 className="text-2xl font-semibold text-white tracking-wide mb-1">Customer Mangement</h1>
+            <h1 className="text-2xl font-semibold text-white tracking-wide mb-1">Customer Management</h1>
             <p className="text-xs" style={{ color: 'rgba(180, 210, 255, 0.35)' }}>
               Create your account
             </p>
@@ -211,12 +258,26 @@ function Register() {
             <div className="flex-1">
               <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
                 style={{ color: 'rgba(180, 210, 255, 0.38)' }}>First Name</label>
-              <input type="text" placeholder="First name" className="glow-input" />
+              <input 
+                type="text" 
+                placeholder="First name" 
+                className="glow-input" 
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+              />
             </div>
             <div className="flex-1">
               <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
                 style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Last Name</label>
-              <input type="text" placeholder="Last name" className="glow-input" />
+              <input 
+                type="text" 
+                placeholder="Last name" 
+                className="glow-input" 
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+              />
             </div>
           </div>
 
@@ -224,7 +285,14 @@ function Register() {
           <div className="input-wrap mb-3">
             <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
               style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Email</label>
-            <input type="email" placeholder="Enter your email" className="glow-input" />
+            <input 
+              type="email" 
+              placeholder="Enter your email" 
+              className="glow-input" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
           </div>
 
           {/* Password */}
@@ -236,8 +304,11 @@ function Register() {
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
                 className="glow-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
               />
-              <button className="toggle-btn" onClick={() => setShowPassword(!showPassword)}>
+              <button type="button" className="toggle-btn" onClick={() => setShowPassword(!showPassword)}>
                 {showPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>
             </div>
@@ -252,14 +323,19 @@ function Register() {
                 type={showConfirmPassword ? 'text' : 'password'}
                 placeholder="Re-enter your password"
                 className="glow-input"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
               />
-              <button className="toggle-btn" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+              <button type="button" className="toggle-btn" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                 {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>
             </div>
           </div>
 
-          <button className="create-btn">Create Account</button>
+          <button type="submit" disabled={loading} className="create-btn">
+            {loading ? 'Creating Account...' : 'Create Account'}
+          </button>
 
           <p className="text-center text-xs mt-5" style={{ color: 'rgba(180,210,255,0.25)' }}>
             Already have an account?{" "}
@@ -267,7 +343,7 @@ function Register() {
               style={{ color: '#7eb8ff' }}>Sign In</a>
           </p>
 
-        </div>
+        </form>
       </div>
     </>
   )
