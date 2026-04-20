@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom' // Para makalipat sa dashboard pag success
-import { supabase } from "../../lib/supabase"; // Siguraduhin na tama ang path ng supabase client mo
+import { supabase } from "../../lib/supabase";
 
 function Login() {
   const canvasRef = useRef(null)
