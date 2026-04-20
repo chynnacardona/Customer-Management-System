@@ -1,73 +1,78 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ParticlesBg from '../../components/layout/ParticlesBg';
-import { supabase } from '../../lib/supabase'; // Make sure tama ang path mo papunta sa supabase config mo
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../../../supabase/supabaseClient";
+import ParticlesBg from "../../components/layout/ParticlesBg";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
-          
-          // Login guard - iche-check kung active o inactive yung user
-          const { data, error } = await supabase
-            .from('user')
-            .select('record_status')
-            .eq('email', session.user.email)
-            .single();
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      navigate("/");
+    } else {
+      const timer = setTimeout(() => navigate("/login"), 3000);
+      return () => clearTimeout(timer);
+    }
+  });
 
-          if (error || !data) {
-            await supabase.auth.signOut();
-            navigate('/login?error=account_not_found');
-            return;
-          }
-
-          if (data.record_status === 'INACTIVE') {
-            await supabase.auth.signOut();
-            navigate('/login?error=inactive');
-            return;
-          }
-
-          // Kung walang problema, papasok na sa main page (e.g., /customers)
-          navigate('/customers');
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+  return () => subscription.unsubscribe();
+}, [navigate]);
 
   return (
     <div style={styles.container}>
-      {/* 1. Eto yung Stars at Fog animation */}
+      {/* 1. Eto yung Stars at Fog animation*/}
       <ParticlesBg />
-      
+
       {/* 2. Eto yung Glassmorphism box sa ibabaw */}
       <div style={styles.loaderBox}>
         <div style={styles.spinner}></div>
-        {/* Ipapakita yung error text kung meron, kung wala "Verifying account..." */}
-        {error ? (
-           <p style={{ ...styles.text, color: 'red' }}>{error}</p>
-        ) : (
-           <p style={styles.text}>Verifying account...</p>
-        )}
+        <p style={styles.text}>Verifying account...</p>
       </div>
     </div>
   );
 };
 
-// Hayaan mo lang yung "const styles = { ... }" mo diyan sa baba
 const styles = {
   container: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    // ... keep mo lang yung existing styles mo
-  }
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100vh",
+    width: "100vw",
+    position: "relative",
+    overflow: "hidden",
+    background:
+      "linear-gradient(160deg, #020818 0%, #051030 50%, #060d28 100%)",
+  },
+  loaderBox: {
+    zIndex: 10,
+    padding: "40px",
+    background: "rgba(8, 18, 40, 0.85)",
+    backdropFilter: "blur(30px)",
+    borderRadius: "22px",
+    border: "1px solid rgba(100, 160, 255, 0.12)",
+    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.7)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "20px",
+  },
+  spinner: {
+    width: "50px",
+    height: "50px",
+    border: "3px solid rgba(100, 160, 255, 0.1)",
+    borderTop: "3px solid #7eb8ff",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+  },
+  text: {
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "white",
+    letterSpacing: "0.1em",
+  },
 };
 
 export default AuthCallback;

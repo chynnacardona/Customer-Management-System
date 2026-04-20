@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "../../supabase/supabaseClient";
 
 const AuthContext = createContext({});
 
@@ -14,9 +14,9 @@ export const AuthProvider = ({ children }) => {
     }
 
     const { data, error } = await supabase
-      .from('user')
-      .select('record_status, role, full_name')
-      .eq('email', sessionUser.email)
+      .from("user")
+      .select("user_id, email, full_name, role, status")
+      .eq("email", sessionUser.email)
       .single();
 
     if (error || !data) {
@@ -25,10 +25,10 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    if (data.record_status === 'INACTIVE') {
+    if (data.status === "INACTIVE") {
       await supabase.auth.signOut();
       setUser(null);
-      alert('Your account is disabled. Please contact your administrator.');
+      alert("Your account is disabled. Please contact your administrator.");
       return;
     }
 
@@ -42,10 +42,12 @@ export const AuthProvider = ({ children }) => {
     });
 
     // Listen for login/logout events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session) {
         await checkAndSetUser(session.user);
-      } else if (event === 'SIGNED_OUT') {
+      } else if (event === "SIGNED_OUT") {
         setUser(null);
       }
       setLoading(false);
@@ -55,7 +57,9 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut: () => supabase.auth.signOut() }}>
+    <AuthContext.Provider
+      value={{ user, loading, signOut: () => supabase.auth.signOut() }}
+    >
       {!loading && children}
     </AuthContext.Provider>
   );
