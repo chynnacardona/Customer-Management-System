@@ -14,7 +14,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route
-          path="/"
+          path="/*"
           element={
             <AppShell>
               <p style={{ color: "rgba(180,210,255,0.4)", fontSize: "13px" }}>

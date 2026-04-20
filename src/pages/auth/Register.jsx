@@ -1,60 +1,35 @@
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from "../../supabase/supabaseClient";
-import { useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
 
 function Register() {
-  const canvasRef = useRef(null);
-  const navigate = useNavigate();
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const canvasRef = useRef(null)
+  const navigate = useNavigate()
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
-
-    if (password !== confirmPassword) {
-      alert("Passwords do not match!");
-      return;
-    }
-
-    setLoading(true);
-
-    const { data, error } = await supabase.auth.signUp({
-      email: email,
-      password: password,
-      options: {
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-
-    if (error) {
-      alert(error.message);
-    } else {
-      alert("Registration successfull!");
-      navigate("/login");
-    }
-    setLoading(false);
-  };
+  // --- States for Form Data ---
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  
+  const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    let animationId;
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    let animationId
 
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
 
     const handleResize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    window.addEventListener("resize", handleResize);
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+    }
+    window.addEventListener('resize', handleResize)
 
     const stars = Array.from({ length: 220 }, () => ({
       x: Math.random() * canvas.width,
@@ -62,62 +37,80 @@ function Register() {
       r: Math.random() * 1.3 + 0.2,
       alpha: Math.random(),
       speed: Math.random() * 0.004 + 0.002,
-    }));
+    }))
 
     function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      stars.forEach((s) => {
-        s.alpha += s.speed;
-        if (s.alpha > 1 || s.alpha < 0) s.speed *= -1;
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(180, 210, 255, ${s.alpha * 0.75})`;
-        ctx.fill();
-      });
-      animationId = requestAnimationFrame(draw);
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      stars.forEach(s => {
+        s.alpha += s.speed
+        if (s.alpha > 1 || s.alpha < 0) s.speed *= -1
+        ctx.beginPath()
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(180, 210, 255, ${s.alpha * 0.75})`
+        ctx.fill()
+      })
+      animationId = requestAnimationFrame(draw)
     }
 
-    draw();
+    draw()
     return () => {
-      cancelAnimationFrame(animationId);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
+      cancelAnimationFrame(animationId)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  // --- Registration Logic ---
+  const handleRegister = async (e) => {
+    e.preventDefault()
+    
+    if (password !== confirmPassword) {
+      return alert("Passwords do not match!")
+    }
+
+    setLoading(true)
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            full_name: `${firstName} ${lastName}`,
+          },
+        },
+      })
+
+      if (error) throw error
+
+      if (data) {
+        alert("Registration successful! Please check your email for verification if enabled, or sign in now.")
+        navigate('/login')
+      }
+    } catch (error) {
+      alert(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Eye icon
   const EyeIcon = () => (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
     </svg>
-  );
+  )
 
   // Eye-off icon
   const EyeOffIcon = () => (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-      <line x1="1" y1="1" x2="23" y2="23" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
     </svg>
-  );
+  )
 
   return (
     <>
@@ -243,38 +236,19 @@ function Register() {
         .create-btn:active { transform: translateY(0px); }
       `}</style>
 
-      <div
-        style={{
-          background:
-            "linear-gradient(160deg, #020818 0%, #051030 50%, #060d28 100%)",
-          minHeight: "100vh",
-          position: "relative",
-        }}
-        className="flex items-center justify-center overflow-hidden"
-      >
+      <div style={{ background: 'linear-gradient(160deg, #020818 0%, #051030 50%, #060d28 100%)', minHeight: '100vh', position: 'relative' }}
+        className="flex items-center justify-center overflow-hidden">
+
         <canvas ref={canvasRef} className="absolute inset-0 z-0" />
+        <div className="absolute inset-0 z-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse at 50% 60%, rgba(20, 60, 180, 0.12) 0%, transparent 70%)' }} />
 
-        <div
-          className="absolute inset-0 z-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse at 50% 60%, rgba(20, 60, 180, 0.12) 0%, transparent 70%)",
-          }}
-        />
+        {/* Card - Wrapped in FORM */}
+        <form onSubmit={handleRegister} className="apple-card relative z-10 w-full mx-4 p-8" style={{ maxWidth: '380px' }}>
 
-        {/* Card */}
-        <div
-          className="apple-card relative z-10 w-full mx-4 p-8"
-          style={{ maxWidth: "380px" }}
-        >
           <div className="text-center mb-7">
-            <h1 className="text-2xl font-semibold text-white tracking-wide mb-1">
-              Customer Mangement
-            </h1>
-            <p
-              className="text-xs"
-              style={{ color: "rgba(180, 210, 255, 0.35)" }}
-            >
+            <h1 className="text-2xl font-semibold text-white tracking-wide mb-1">Customer Management</h1>
+            <p className="text-xs" style={{ color: 'rgba(180, 210, 255, 0.35)' }}>
               Create your account
             </p>
           </div>
@@ -282,63 +256,40 @@ function Register() {
           {/* First Name & Last Name */}
           <div className="input-wrap flex gap-3 mb-3">
             <div className="flex-1">
-              <label
-                className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
-                style={{ color: "rgba(180, 210, 255, 0.38)" }}
-              >
-                First Name
-              </label>
-              <input
-                type="text"
-                placeholder="First name"
-                className="glow-input"
+              <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+                style={{ color: 'rgba(180, 210, 255, 0.38)' }}>First Name</label>
+              <input 
+                type="text" 
+                placeholder="First name" 
+                className="glow-input" 
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
               />
             </div>
             <div className="flex-1">
-              <label
-                className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
-                style={{ color: "rgba(180, 210, 255, 0.38)" }}
-              >
-                Last Name
-              </label>
-              <input
-                type="text"
-                placeholder="Last name"
-                className="glow-input"
+              <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+                style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Last Name</label>
+              <input 
+                type="text" 
+                placeholder="Last name" 
+                className="glow-input" 
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
               />
             </div>
           </div>
 
-          <div className="input-wrap mb-3">
-            <label
-              className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
-              style={{ color: "rgba(180, 210, 255, 0.38)" }}
-            >
-              Full Name
-            </label>
-            {/* Input */}
-            <input
-              type="text"
-              placeholder="Enter Full Name (Juan Dela Cruz)"
-              className="glow-input"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-            />
-          </div>
           {/* Email */}
           <div className="input-wrap mb-3">
-            <label
-              className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
-              style={{ color: "rgba(180, 210, 255, 0.38)" }}
-            >
-              Email
-            </label>
-            <input
-              type="email"
-              placeholder="Enter your email"
+            <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+              style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Email</label>
+            <input 
+              type="email" 
+              placeholder="Enter your email" 
+              className="glow-input" 
               value={email}
-              className="glow-input"
               onChange={(e) => setEmail(e.target.value)}
               required
             />
@@ -346,25 +297,18 @@ function Register() {
 
           {/* Password */}
           <div className="input-wrap mb-3">
-            <label
-              className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
-              style={{ color: "rgba(180, 210, 255, 0.38)" }}
-            >
-              Password
-            </label>
+            <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+              style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Password</label>
             <div className="input-container">
               <input
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
                 className="glow-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-              <button
-                className="toggle-btn"
-                onClick={() => setShowPassword(!showPassword)}
-              >
+              <button type="button" className="toggle-btn" onClick={() => setShowPassword(!showPassword)}>
                 {showPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>
             </div>
@@ -372,54 +316,37 @@ function Register() {
 
           {/* Confirm Password */}
           <div className="input-wrap mb-5">
-            <label
-              className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
-              style={{ color: "rgba(180, 210, 255, 0.38)" }}
-            >
-              Confirm Password
-            </label>
+            <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+              style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Confirm Password</label>
             <div className="input-container">
               <input
-                type={showConfirmPassword ? "text" : "password"}
+                type={showConfirmPassword ? 'text' : 'password'}
                 placeholder="Re-enter your password"
                 className="glow-input"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
               />
-              <button
-                className="toggle-btn"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
+              <button type="button" className="toggle-btn" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                 {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
               </button>
             </div>
           </div>
 
-          <form onSubmit={handleRegister}>
-            {/* Inputs */}
-            <button type="submit" className="create-btn" disabled={loading}>
-              {loading ? "...." : "Create Account"}
-            </button>
-          </form>
+          <button type="submit" disabled={loading} className="create-btn">
+            {loading ? 'Creating Account...' : 'Create Account'}
+          </button>
 
-          <p
-            className="text-center text-xs mt-5"
-            style={{ color: "rgba(180,210,255,0.25)" }}
-          >
+          <p className="text-center text-xs mt-5" style={{ color: 'rgba(180,210,255,0.25)' }}>
             Already have an account?{" "}
-            <a
-              href="/login"
-              className="font-medium transition-all hover:opacity-80"
-              style={{ color: "#7eb8ff" }}
-            >
-              Sign In
-            </a>
+            <a href="/login" className="font-medium transition-all hover:opacity-80"
+              style={{ color: '#7eb8ff' }}>Sign In</a>
           </p>
-        </div>
+
+        </form>
       </div>
     </>
-  );
+  )
 }
 
-export default Register;
+export default Register
