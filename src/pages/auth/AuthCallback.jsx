@@ -1,23 +1,43 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 import ParticlesBg from '../../components/layout/ParticlesBg'; 
 
 const AuthCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        // Kapag may session na (Success Google Login), diretso Dashboard
+        navigate('/dashboard');
+      } else if (event === 'SIGNED_OUT') {
+        // Kung walang session o nag-error, balik sa Login
+        navigate('/login');
+      }
+    });
+
+    // 2. Backup check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        navigate('/dashboard');
+      }
+    });
+
+    // Timeout as LAST RESORT (pag lumampas ng 5 secs at wala pa ring nangyayari)
+    const fallbackTimer = setTimeout(() => {
       navigate('/login');
-    }, 2000);
-    return () => clearTimeout(timer);
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(fallbackTimer);
+    };
   }, [navigate]);
 
   return (
     <div style={styles.container}>
-      {/* 1. Eto yung Stars at Fog animation*/}
       <ParticlesBg />
-
-      {/* 2. Eto yung Glassmorphism box sa ibabaw */}
       <div style={styles.loaderBox}>
         <div style={styles.spinner}></div>
         <p style={styles.text}>Verifying account...</p>

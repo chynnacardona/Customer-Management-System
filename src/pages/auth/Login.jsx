@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom' // Para makalipat sa dashboard pag success
+import { useNavigate } from 'react-router-dom'
 import { supabase } from "../../lib/supabase";
 
 function Login() {
@@ -11,6 +11,9 @@ function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  
+  const [isError, setIsError] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -48,34 +51,48 @@ function Login() {
     }
 
     draw()
-    return () => {
-      cancelAnimationFrame(animationId)
-      window.removeEventListener('resize', handleResize)
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    console.log("Auth Event:", event);
+    
+    // Pag nakita ng app yung 'SIGNED_IN' na galing Google, diretso na dapat siya sa dashboard.
+    if (event === 'SIGNED_IN' && session) {
+      navigate('/dashboard');
     }
-  }, [])
+  });
+
+  return () => {
+    subscription.unsubscribe(); // Importante ito para walang memory leak
+  };
+}, [navigate]);
+
+  
 
   // --- Eto yung Login Function ---
   const handleLogin = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+  e.preventDefault()
+  setLoading(true)
+  setIsError(false)
+  setErrorMsg('')
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password,
-      })
-
-      if (error) throw error
-
-      if (data.user) {
-        navigate('/dashboard') // O kung saan man ang home niyo
-      }
-    } catch (error) {
-      alert(error.message || "Invalid credentials")
-    } finally {
-      setLoading(false)
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: password,
+    })
+    if (error) throw error
+    if (data.user) navigate('/dashboard')
+  } catch (error) {
+    setIsError(true) // Eto yung magpapapula ng outline
+    if (error.message === "Invalid login credentials") {
+      setErrorMsg("Account not found. Please register first.")
+    } else {
+      setErrorMsg(error.message)
     }
+  } finally {
+    setLoading(false)
   }
+}
 
   // --- Google Login Function ---
   const handleGoogleLogin = async () => {
@@ -227,7 +244,25 @@ function Login() {
           transform: translateY(-2px);
           box-shadow: 0 6px 20px rgba(30, 80, 220, 0.2);
         }
-        .google-btn:active { transform: translateY(0px); }
+        .google-btn:active { 
+          transform: translateY(0px); 
+        }
+        /* Red error state for inputs */
+        .glow-input.error-glow {
+          border-color: rgba(255, 70, 70, 0.5) !important;
+          background: rgba(255, 70, 70, 0.05) !important;
+          box-shadow: 0 0 0 3px rgba(255, 70, 70, 0.1), 0 0 12px rgba(255, 70, 70, 0.15) !important;
+        }
+
+        /* Optional: Shake animation para mas ramdam yung error */
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .shake-error {
+          animation: shake 0.2s ease-in-out 0s 2;
+        }
       `}</style>
 
       <div style={{ background: 'linear-gradient(160deg, #020818 0%, #051030 50%, #060d28 100%)', minHeight: '100vh', position: 'relative' }}
@@ -237,8 +272,12 @@ function Login() {
         <div className="absolute inset-0 z-0 pointer-events-none"
           style={{ background: 'radial-gradient(ellipse at 50% 60%, rgba(20, 60, 180, 0.12) 0%, transparent 70%)' }} />
 
-        {/* Card - Balutin natin sa FORM para gumana ang Enter key */}
-        <form onSubmit={handleLogin} className="apple-card relative z-10 w-full mx-4 p-8" style={{ maxWidth: '380px' }}>
+        {/* Card - Balutin sa FORM para gumana yung Enter key */}
+        <form 
+          onSubmit={handleLogin} 
+          className={`apple-card relative z-10 w-full mx-4 p-8 ${isError ? 'shake-error' : ''}`} 
+          style={{ maxWidth: '380px' }}
+        >
           
           <div className="text-center mb-7">
             <h1 className="text-2xl font-semibold text-white tracking-wide mb-1">Customer Management</h1>
@@ -254,9 +293,12 @@ function Login() {
             <input 
               type="email" 
               placeholder="Enter your email" 
-              className="glow-input"
+              className={`glow-input ${isError ? 'error-glow' : ''}`} // Magpupula ito pag may error
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setIsError(false); // Mawawala yung pula pag nag-type ulit
+              }}
               required
             />
           </div>
@@ -269,13 +311,16 @@ function Login() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
-                className="glow-input mb-1.5"
+                className={`glow-input mb-1.5 ${isError ? 'error-glow' : ''}`} // Magpupula rin ito
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setIsError(false); // Mawawala yung pula pag nag-type ulit
+                }}
                 required
               />
               <button type="button" className="toggle-btn mb-1.5" onClick={() => setShowPassword(!showPassword)}>
-                {showPassword ? "👁️" : "👁️‍🗨️"} {/* Replaced with simple emojis for brevity, but keep your SVG icons! */}
+                {showPassword ? "👁️" : "👁️‍🗨️"}
               </button>
             </div>
           </div>
@@ -284,18 +329,33 @@ function Login() {
             <a href="/forgot-password" style={{ color: '#7eb8ff' }} className="text-xs">Forgot password?</a>
           </div>
 
+          {/* ETO YUNG MESSAGE SA BABA */}
+          {isError && (
+            <div className="mb-4 text-center">
+              <p className="text-[10px]" style={{ color: '#ff9494' }}>
+                Account not found. Please register first.
+              </p>
+            </div>
+          )}
+
           <button type="submit" disabled={loading} className="sign-in-btn mb-3">
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>
 
-          {/* ... or divider ... */}
-
-          <button type="button" onClick={handleGoogleLogin} className="google-btn">
+          <button type="button" onClick={handleGoogleLogin} className="google-btn mb-4">
             <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-4 h-4" />
             Sign in with Google
           </button>
 
-          {/* ... register link ... */}
+          {/* Divider at Register Link */}
+          <div className="text-center pt-4 mt-2 border-t border-white/5">
+            <p className="text-xs" style={{ color: 'rgba(180, 210, 255, 0.45)' }}>
+              No account yet?{' '}
+              <a href="/register" className="font-medium hover:underline" style={{ color: '#7eb8ff' }}>
+                Register here
+              </a>
+            </p>
+          </div>
         </form>
       </div>
     </>
