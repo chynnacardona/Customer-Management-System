@@ -70,29 +70,50 @@ function Login() {
 
   // --- Eto yung Login Function ---
   const handleLogin = async (e) => {
-  e.preventDefault()
-  setLoading(true)
-  setIsError(false)
-  setErrorMsg('')
+    e.preventDefault()
+    setLoading(true)
+    setIsError(false)
+    setErrorMsg('')
 
-  try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: password,
-    })
-    if (error) throw error
-    if (data.user) navigate('/dashboard')
-  } catch (error) {
-    setIsError(true) // Eto yung magpapapula ng outline
-    if (error.message === "Invalid login credentials") {
-      setErrorMsg("Account not found. Please register first.")
-    } else {
-      setErrorMsg(error.message)
+    try {
+      // 1. Check muna natin sa public 'user' table kung nandun yung email
+      const { data: dbUser } = await supabase
+        .from('user')
+        .select('email')
+        .eq('email', email.trim())
+        .maybeSingle()
+
+      // 2. Subukan ang manual login via Auth
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      })
+
+      if (authError) {
+        setIsError(true)
+        
+        // Dito papasok yung "Hint" logic
+        if (authError.message.includes("Invalid login credentials")) {
+          if (dbUser) {
+            // Kung andun sa table pero mali ang credentials, malamang Google account to
+            setErrorMsg("Invalid credentials. If you used Google before, please use the Google button.")
+          } else {
+            setErrorMsg("Account not found. Please register first.")
+          }
+        } else {
+          setErrorMsg(authError.message)
+        }
+      } else if (data?.user) {
+        navigate('/dashboard')
+      }
+    } catch (error) {
+      setIsError(true)
+      setErrorMsg("An unexpected error occurred.")
+      console.error(error)
+    } finally {
+      setLoading(false)
     }
-  } finally {
-    setLoading(false)
   }
-}
 
   // --- Google Login Function ---
   const handleGoogleLogin = async () => {
@@ -329,11 +350,11 @@ function Login() {
             <a href="/forgot-password" style={{ color: '#7eb8ff' }} className="text-xs">Forgot password?</a>
           </div>
 
-          {/* ETO YUNG MESSAGE SA BABA */}
+          {/* ETO YUNG MESSAGE SA BABA - Dynamic na dapat ito */}
           {isError && (
             <div className="mb-4 text-center">
-              <p className="text-[10px]" style={{ color: '#ff9494' }}>
-                Account not found. Please register first.
+              <p className="text-[11px] font-medium px-4" style={{ color: '#ff9494', lineHeight: '1.4' }}>
+                {errorMsg}
               </p>
             </div>
           )}
