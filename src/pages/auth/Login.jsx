@@ -77,10 +77,10 @@ function Login() {
 
     try {
       // 1. Check muna natin sa public 'user' table kung nandun yung email
-      const { data: dbUser } = await supabase
+      const { data: dbUser, error: dbError } = await supabase
         .from('user')
         .select('email')
-        .eq('email', email.trim())
+        .eq('email', email.trim().toLowerCase())
         .maybeSingle()
 
       // 2. Subukan ang manual login via Auth

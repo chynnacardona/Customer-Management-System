@@ -1,0 +1,1 @@
+export default function ProductCatalog() { return <div>Product Catalog</div> }

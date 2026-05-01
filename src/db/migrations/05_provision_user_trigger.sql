@@ -1,60 +1,54 @@
--- ============================================================
--- PR-04: provision_new_user trigger
--- Fires after every new INSERT into auth.users
--- Creates a matching row in public.user, user_module,
--- and UserModule_Rights with safe defaults.
--- ============================================================
+--PR-04: provision_new_user trigger
 
--- 1. Create the Function
-CREATE OR REPLACE FUNCTION public.handle_new_user_provision()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_user_id INT;
+ -- 1. CLEANUP: Remove old triggers and functions to prevent "duplicate" errors
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user();
+DROP FUNCTION IF EXISTS public.handle_new_user_provision();
+
+-- 2. THE NEW AUTOMATED PROVISIONING FUNCTION
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
 BEGIN
-  -- Insert into custom user table
-  INSERT INTO public.user (email, full_name, role, record_status)
+  -- A. Create the user profile row
+  -- Uses naming from your Documentation Screenshot 4.3
+  INSERT INTO public."user" ("userId", email, full_name, user_type, record_status)
   VALUES (
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', 'New User'),
-    'USER',
-    'INACTIVE'  -- Admin must manually activate
-  )
-  RETURNING user_id INTO v_user_id;
+    NEW.id, 
+    NEW.email, 
+    COALESCE(NEW.raw_user_meta_data->>'full_name', 'New User'), 
+    'USER', 
+    'INACTIVE' -- As per Section 4.1: pending admin activation
+  );
 
-  -- Insert 4 module rows for this user
-  INSERT INTO public.user_module (user_id, module_id)
-  SELECT v_user_id, m.module_id
-  FROM public.module m
-  WHERE m.module_id IN ('Cust_Mod', 'Sales_Mod', 'Prod_Mod', 'Adm_Mod');
+  -- B. YOUR SCRIPT: Link the new user to all 4 Modules in user_module
+  INSERT INTO public.user_module ("userId", module_id)
+  SELECT NEW.id, m.module_id 
+  FROM public.Module m;
 
-  -- Insert 9 rights rows (VIEW rights = 1, everything else = 0)
-  INSERT INTO public.UserModule_Rights (user_id, module_id, right_id, is_allowed)
-  SELECT
-    v_user_id,
-    um.module_id,
-    r.right_id,
-    CASE
-      WHEN r.right_id IN (
-        'CUST_VIEW', 'SALES_VIEW', 'SD_VIEW', 'PROD_VIEW', 'PRICE_VIEW'
-      ) THEN 1
-      ELSE 0  -- CUST_ADD, CUST_EDIT, CUST_DEL, ADM_USER = 0
+  -- C. YOUR SCRIPT: Map the 9 Rights (Default VIEW rights for new users)
+  -- Based on Screenshot 4.1: VIEW rights = 1, others = 0
+  INSERT INTO public.UserModule_Rights ("userId", module_id, right_id, is_allowed)
+  SELECT 
+    NEW.id, 
+    m.module_id, 
+    r.right_id, 
+    CASE 
+      WHEN r.right_id IN ('CUST_VIEW', 'SALES_VIEW', 'SD_VIEW', 'PROD_VIEW', 'PRICE_VIEW') THEN 1 
+      ELSE 0 
     END
-  FROM public.user_module um
+  FROM public.Module m
   CROSS JOIN public.rights r
-  WHERE um.user_id = v_user_id;
+  -- Only insert if the right belongs to the module (using your seed logic)
+  WHERE (m.module_id = 'Cust_Mod' AND r.right_id LIKE 'CUST%')
+     OR (m.module_id = 'Sales_Mod' AND r.right_id IN ('SALES_VIEW', 'SD_VIEW'))
+     OR (m.module_id = 'Prod_Mod' AND r.right_id IN ('PROD_VIEW', 'PRICE_VIEW'))
+     OR (m.module_id = 'Adm_Mod' AND r.right_id = 'ADM_USER');
 
   RETURN NEW;
 END;
-$$;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. Attach trigger to auth.users
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-
+-- 3. ACTIVATE THE TRIGGER
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
-  FOR EACH ROW
-  EXECUTE PROCEDURE public.handle_new_user_provision();
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();

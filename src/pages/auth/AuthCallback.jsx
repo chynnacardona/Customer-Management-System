@@ -7,31 +7,27 @@ const AuthCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // 1. Listen for the session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
-        // Kapag may session na (Success Google Login), diretso Dashboard
-        navigate('/dashboard');
+        // Navigate to root to let ProtectedRoute handle the redirect
+        // replace: true prevents the user from going back to the loading screen
+        navigate('/', { replace: true });
       } else if (event === 'SIGNED_OUT') {
-        // Kung walang session o nag-error, balik sa Login
-        navigate('/login');
+        navigate('/login', { replace: true });
       }
     });
 
-    // 2. Backup check
+    // 2. Immediate session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate('/dashboard');
+        navigate('/', { replace: true });
       }
     });
 
-    // Timeout as LAST RESORT (pag lumampas ng 5 secs at wala pa ring nangyayari)
-    const fallbackTimer = setTimeout(() => {
-      navigate('/login');
-    }, 5000);
-
+    // 3. Cleanup
     return () => {
       subscription.unsubscribe();
-      clearTimeout(fallbackTimer);
     };
   }, [navigate]);
 
@@ -77,7 +73,7 @@ const styles = {
     border: '3px solid rgba(100, 160, 255, 0.1)',
     borderTop: '3px solid #7eb8ff',
     borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
+    animation: 'spin 1s linear infinite', // Note: ensure you have this @keyframes in your CSS
   },
   text: {
     fontSize: '14px',
