@@ -5,6 +5,7 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import AppShell from "./components/layout/AppShell";
 import AuthCallback from "./pages/auth/AuthCallback";
+import CustomerListPage from './pages/customers/CustomerListPage'
 
 function App() {
   return (
@@ -23,6 +24,11 @@ function App() {
             </AppShell>
           }
         />
+        <Route path="/lookups/customers" element={
+          <AppShell>
+            <CustomerListPage />
+          </AppShell>
+        } />
       </Routes>
     </AuthProvider>
   );
