@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { Search, Eye, Edit, Trash2, Plus, ChevronLeft, ChevronRight, UserCheck } from 'lucide-react'
+import AddCustomerModal from '../../components/shared/AddCustomerModal'
+import EditCustomerModal from '../../components/shared/EditCustomerModal'
+import SoftDeleteConfirmDialog from '../../components/shared/SoftDeleteConfirmDialog'
 
 // Dummy data - si M4 na bahala magfetch ng real data from supabase
 const DUMMY_CUSTOMERS = [
@@ -24,6 +27,9 @@ function CustomerListPage() {
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedRow, setSelectedRow] = useState(null)
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState(null)
+  const [deletingCustomer, setDeletingCustomer] = useState(null)
 
   // Filter by search
   const filtered = DUMMY_CUSTOMERS.filter(c =>
@@ -40,6 +46,16 @@ function CustomerListPage() {
   const handleSearch = (e) => {
     setSearch(e.target.value)
     setCurrentPage(1)
+  }
+
+  const handleEditClick = (e, customer) => {
+    e.stopPropagation()
+    setEditingCustomer(customer)
+  }
+
+  const handleDeleteClick = (e, customer) => {
+    e.stopPropagation()
+    setDeletingCustomer(customer)
   }
 
   const paytermColor = (term) => {
@@ -360,7 +376,7 @@ function CustomerListPage() {
               />
             </div>
             {/* para kay M4: itago yung button na to kung ang user ay walang CUST_ADD na karapatan*/} 
-            <button className="add-btn">
+            <button className="add-btn" onClick={() => setIsAddModalOpen(true)}>
               <Plus size={14} />
               Add Customer
             </button>
@@ -428,15 +444,27 @@ function CustomerListPage() {
                       <td>
                         <div className="action-cell">
                           {/* View */}
-                          <button className="action-btn view" title="View">
+                          <button
+                            className="action-btn view"
+                            title="View"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <Eye size={13} />
                           </button>
                           {/* para kay M4: itago yung button na to kung yung user ay walang CUST_EDIT na karapatan*/}
-                          <button className="action-btn edit" title="Edit">
+                          <button
+                            className="action-btn edit"
+                            title="Edit"
+                            onClick={(e) => handleEditClick(e, customer)}
+                          >
                             <Edit size={13} />
                           </button>
                           {/* para kay M4: itago yung button na to kung yung user ay walang CUST_DEL na karapatan. SUPERADMIN lang yung may karapatang neto*/}
-                          <button className="action-btn delete" title="Delete">
+                          <button
+                            className="action-btn delete"
+                            title="Delete"
+                            onClick={(e) => handleDeleteClick(e, customer)}
+                          >
                             <Trash2 size={13} />
                           </button>
                         </div>
@@ -486,6 +514,24 @@ function CustomerListPage() {
         </div>
 
       </div>
+
+      <AddCustomerModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+      />
+
+      <EditCustomerModal
+        isOpen={Boolean(editingCustomer)}
+        customer={editingCustomer}
+        onClose={() => setEditingCustomer(null)}
+      />
+
+      <SoftDeleteConfirmDialog
+        isOpen={Boolean(deletingCustomer)}
+        customer={deletingCustomer}
+        onClose={() => setDeletingCustomer(null)}
+        onConfirm={() => console.log('Confirmed deactivate:', deletingCustomer?.custno)}
+      />
     </>
   )
 }
