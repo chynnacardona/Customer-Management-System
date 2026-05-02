@@ -14,8 +14,10 @@ const AppShell = ({ children }) => {
       {/* 3. Main Content Area */}
       <main style={shellStyles.mainContent}>
         {children}
+        
       </main>
     </div>
+    
   );
 };
 
