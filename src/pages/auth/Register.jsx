@@ -12,10 +12,16 @@ function Register() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  
-  const [loading, setLoading] = useState(false)
+
+  // Idagdag itong dalawa para sa visibility ng password
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [errorField, setErrorField] = useState('') // Importante ito para sa red border
+
+  const [isSuccess, setIsSuccess] = useState(false); // Para sa visibility ng success card
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -61,56 +67,76 @@ function Register() {
 
   // --- Registration Logic ---
   const handleRegister = async (e) => {
-    e.preventDefault()
-    
-    if (password !== confirmPassword) {
-      return alert("Passwords do not match!")
-    }
+  e.preventDefault()
+  setLoading(true)
+  setErrorMsg('')
+  setErrorField('')
 
-    setLoading(true)
-
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: password,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-            full_name: `${firstName} ${lastName}`,
-          },
-        },
-      })
-
-      if (error) throw error
-
-      if (data) {
-        alert("Registration successful! Please check your email for verification if enabled, or sign in now.")
-        navigate('/login')
-      }
-    } catch (error) {
-      alert(error.message)
-    } finally {
-      setLoading(false)
-    }
+  // Check kung magkapareho ang password
+  if (password !== confirmPassword) {
+    setErrorMsg("Passwords do not match!")
+    setErrorField('confirmPassword') // I-rered ang confirm password
+    setLoading(false)
+    return
   }
 
-  // Eye icon
-  const EyeIcon = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-      <circle cx="12" cy="12" r="3"/>
-    </svg>
-  )
+  try {
+    // Check sa public 'user' table niyo
+    const { data: existingUser } = await supabase
+      .from('user')
+      .select('email')
+      .eq('email', email.trim())
+      .maybeSingle()
 
-  // Eye-off icon
-  const EyeOffIcon = () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-      <line x1="1" y1="1" x2="23" y2="23"/>
-    </svg>
-  )
+    if (existingUser) {
+      setErrorField('email') // I-rered ang email field
+      setErrorMsg("This email is already registered. Try logging in with Google.")
+      setLoading(false)
+      return
+    }
+
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: password,
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+        }
+      }
+    })
+
+    if (signUpError) throw signUpError
+
+    if (data.user) {
+    // Insert sa public table niyo
+    await supabase.from('user').insert([
+        { 
+            email: email.trim(), 
+            full_name: `${firstName} ${lastName}`, 
+            role: 'USER', 
+            status: 'ACTIVE' 
+        }
+    ]);
+
+    // 1. I-set ang success state sa true
+    setIsSuccess(true);
+    setLoading(false);
+
+    // 2. Mag-wait ng 3 seconds bago lumipat sa login page
+    setTimeout(() => {
+        navigate('/login');
+    }, 3000);
+}
+  } catch (error) {
+    setErrorMsg(error.message)
+    // Dito natin huhulihin yung ibang errors para mag-red ang fields
+    if (error.message.toLowerCase().includes("email")) setErrorField('email')
+    if (error.message.toLowerCase().includes("password")) setErrorField('password')
+  } finally {
+    setLoading(false)
+  }
+}
 
   return (
     <>
@@ -203,6 +229,7 @@ function Register() {
           padding: 0;
           display: flex;
           align-items: center;
+          bottom: 4px;
         }
         .toggle-btn:hover { color: rgba(180, 210, 255, 0.7); }
 
@@ -233,7 +260,53 @@ function Register() {
           transform: translateY(-2px);
           box-shadow: 0 8px 25px rgba(30, 80, 220, 0.45), 0 0 0 1px rgba(100,160,255,0.2);
         }
-        .create-btn:active { transform: translateY(0px); }
+        .create-btn:active { 
+        transform: translateY(0px); 
+        }
+        .error-glow {
+          border-color: rgba(255, 100, 100, 0.5) !important;
+          background: rgba(255, 50, 50, 0.05) !important;
+          box-shadow: 0 0 10px rgba(255, 50, 50, 0.15) !important;
+        }
+        @keyframes shakeError {
+          0%, 100% { transform: translateX(0); }
+          20%, 60% { transform: translateX(-4px); }
+          40%, 80% { transform: translateX(4px); }
+        }
+        .shake-error {
+          animation: shakeError 0.4s ease-in-out;
+        }
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        .success-notification {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: rgba(10, 25, 50, 0.9);
+          backdrop-filter: blur(15px);
+          border: 1px solid rgba(0, 255, 150, 0.3);
+          padding: 16px 24px;
+          border-radius: 16px;
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+          animation: slideInRight 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .success-icon {
+          background: #00ff96;
+          color: #051030;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: bold;
+        }
       `}</style>
 
       <div style={{ background: 'linear-gradient(160deg, #020818 0%, #051030 50%, #060d28 100%)', minHeight: '100vh', position: 'relative' }}
@@ -288,7 +361,8 @@ function Register() {
             <input 
               type="email" 
               placeholder="Enter your email" 
-              className="glow-input" 
+              // Dito papasok yung red border logic
+              className={`glow-input ${errorField === 'email' ? 'error-glow' : ''}`} 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -303,13 +377,17 @@ function Register() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
-                className="glow-input"
+                className={`glow-input ${errorField === 'password' ? 'error-glow' : ''}`}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-              <button type="button" className="toggle-btn" onClick={() => setShowPassword(!showPassword)}>
-                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              <button 
+                type="button" 
+                className="toggle-btn mb-1.5" // Sinunod natin yung class mo sa login
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? "👁️" : "👁️‍🗨️"}
               </button>
             </div>
           </div>
@@ -322,16 +400,29 @@ function Register() {
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
                 placeholder="Re-enter your password"
-                className="glow-input"
+                className={`glow-input ${errorField === 'confirmPassword' ? 'error-glow' : ''}`}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
               />
-              <button type="button" className="toggle-btn" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
+              <button 
+                type="button" 
+                className="toggle-btn mb-1.5" 
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              >
+                {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
               </button>
             </div>
           </div>
+
+          {/* Lalabas lang ito kapag may errorMsg na state */}
+          {errorMsg && (
+            <div className="mb-4 text-center">
+              <p className="text-[11px] font-medium" style={{ color: '#ff9494' }}>
+                {errorMsg}
+              </p>
+            </div>
+          )}
 
           <button type="submit" disabled={loading} className="create-btn">
             {loading ? 'Creating Account...' : 'Create Account'}
@@ -344,6 +435,23 @@ function Register() {
           </p>
 
         </form>
+
+        {/* Success Notification */}
+        {isSuccess && (
+          <div className="success-notification">
+            <div className="success-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <div>
+              <h4 className="text-white text-sm font-semibold">Registration Successful!</h4>
+              <p style={{ color: 'rgba(180, 210, 255, 0.6)', fontSize: '11px' }}>
+                Redirecting you to login page...
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
