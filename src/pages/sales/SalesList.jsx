@@ -1,0 +1,1 @@
+export default function SalesList() { return <div>Page Name</div> }

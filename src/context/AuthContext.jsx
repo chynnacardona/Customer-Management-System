@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "../supabase/supabaseClient";
 
 const AuthContext = createContext({});
 
@@ -7,47 +7,59 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const handleLogin = async (emailInput) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: emailInput,
+      options: { emailRedirectTo: 'http://localhost:5173/auth/callback' },
+    });
+    if (error) alert("Login Error: " + error.message);
+    else alert("Check your email for the magic link!");
+  };
+
   const checkAndSetUser = async (sessionUser) => {
     if (!sessionUser) {
       setUser(null);
       return;
     }
 
-    const { data, error } = await supabase
-      .from('user')
-      .select('user_id, email, full_name, role, status')
-      .eq('email', sessionUser.email)
-      .single();
+    try {
+      // Tally with Screenshot 4.2 naming
+      const { data: userRow, error } = await supabase
+        .from('user')
+        .select('record_status, user_type, email, full_name')
+        .eq('userId', sessionUser.id) 
+        .single();
 
-    if (error || !data) {
-      await supabase.auth.signOut();
-      setUser(null);
-      return;
+      if (error || !userRow) {
+        console.warn("User record not found. Allowing entry for setup.");
+        setUser(sessionUser);
+        return;
+      }
+
+      // Login Guard Check (Screenshot 4.2)
+      if (userRow.record_status !== 'ACTIVE') {
+        await supabase.auth.signOut();
+        setUser(null);
+        alert("Your account is pending activation by a Sales Manager.");
+        return;
+      }
+
+      setUser({ ...sessionUser, ...userRow });
+    } catch (err) {
+      setUser(sessionUser);
     }
-
-    if (data.status === 'INACTIVE') {
-      await supabase.auth.signOut();
-      setUser(null);
-      alert('Your account is disabled. Please contact your administrator.');
-      return;
-    }
-
-    setUser({ ...sessionUser, ...data });
   };
 
   useEffect(() => {
-    // Check session on first load
     supabase.auth.getSession().then(({ data: { session } }) => {
-      checkAndSetUser(session?.user ?? null).finally(() => setLoading(false));
+      if (session?.user) checkAndSetUser(session.user).finally(() => setLoading(false));
+      else setLoading(false);
     });
 
-    // Listen for login/logout events
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        await checkAndSetUser(session.user);
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-      }
+      setLoading(true);
+      if (session?.user) await checkAndSetUser(session.user);
+      else setUser(null);
       setLoading(false);
     });
 
@@ -55,7 +67,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut: () => supabase.auth.signOut() }}>
+    <AuthContext.Provider value={{ user, loading, handleLogin, signOut: () => supabase.auth.signOut() }}>
       {!loading && children}
     </AuthContext.Provider>
   );
