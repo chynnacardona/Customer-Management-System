@@ -54,11 +54,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/lookups/customers" element={
-          <AppShell>
-            <CustomerListPage />
-          </AppShell>
-        } />
       </Routes>
     </AuthProvider>
   );
