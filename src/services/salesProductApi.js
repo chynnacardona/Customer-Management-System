@@ -40,9 +40,9 @@ export const softDeleteCustomer = async (custno) => {
 };
 
 export const getSalesDetail = async (transno) => {
-  // Use lowercase 'salesdetail' and 'product' to match PostgreSQL
+  // Use all-lowercase table names
   const { data, error } = await supabase
-    .from('salesdetail') 
+    .from('salesdetail')
     .select(`
       quantity,
       prodcode,
@@ -55,7 +55,12 @@ export const getSalesDetail = async (transno) => {
     .eq('transno', transno);
 
   if (error) throw error;
-  return data;
+  
+  // M1 Logic: Match the most recent price from pricehist
+  return data.map(item => ({
+    ...item,
+    unit_price: item.product?.pricehist?.[0]?.unitprice || 0
+  }));
 };
 
 export const getProducts = async () => {
