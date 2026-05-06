@@ -10,7 +10,7 @@ March 31, 2026 – April 14, 2026
 - M2: PR-01 / PR-02 (On process)
 - M3:
 - M4:
-- M5: PR-02
+- M5: PR-02 (On process)
 
 ## Blockers
 

@@ -11,30 +11,51 @@
 
 ## Installation
 1. Clone the repository:
+
+   ```bash
    git clone <repo-url>
-
-2. Go into the project folder:
+   ```
+   
+3. Go into the project folder:
+   
+   ```bash
    cd Customer-Management-System
+   ```
 
-3. Checkout the dev branch:
+4. Checkout the dev branch:
+   
+   ```bash
    git checkout dev
+   ```
+   
+6. Install dependencies:
 
-4. Install dependencies:
+   ```bash
    npm install
-
+   ```
+   
 ## Environment Setup
 1. Copy the example env file:
-   cp .env.example .env
 
-2. Open your .env file and fill in the values:
+   ```bash
+   cp .env.example .env
+   ```
+   
+3. Open your .env file and fill in the values:
    - VITE_SUPABASE_URL — get this from your Supabase project dashboard
    - VITE_SUPABASE_ANON_KEY — also from your Supabase dashboard
 
 ## Running the App
+   
+   ```bash
    npm run dev
+   ```
 
 ## Running Tests
+
+  ```bash
    npm test
+  ```
 
 ## Branch & PR Rules
 - NEVER push directly to main or dev
