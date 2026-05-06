@@ -1,12 +1,14 @@
-import { X, ReceiptText } from 'lucide-react'
+import { X, ReceiptText, Loader2 } from 'lucide-react'
 
-function SalesDetailModal({ isOpen, onClose, transaction }) {
+// Added details and isLoading to the props
+function SalesDetailModal({ isOpen, onClose, transaction, details, isLoading }) {
   if (!isOpen || !transaction) return null
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value)
 
-  const total = transaction.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
+  // Use total_amount from the database, or fall back to calculation if data is weird
+  const displayTotal = transaction.total_amount || transaction.total || 0;
 
   return (
     <>
@@ -26,7 +28,7 @@ function SalesDetailModal({ isOpen, onClose, transaction }) {
         .sales-detail-meta-item { background: rgba(100, 160, 255, 0.04); border: 1px solid rgba(100, 160, 255, 0.08); border-radius: 10px; padding: 10px 12px; }
         .sales-detail-label { display: block; color: rgba(180, 210, 255, 0.28); font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 5px; }
         .sales-detail-value { color: rgba(220, 235, 255, 0.88); font-size: 12.5px; font-weight: 600; }
-        .sales-detail-table-wrap { border: 1px solid rgba(100, 160, 255, 0.08); border-radius: 12px; overflow: hidden; }
+        .sales-detail-table-wrap { border: 1px solid rgba(100, 160, 255, 0.08); border-radius: 12px; overflow: hidden; min-height: 100px; position: relative; }
         .sales-detail-table { width: 100%; border-collapse: collapse; }
         .sales-detail-table th { padding: 11px 12px; text-align: left; color: rgba(180, 210, 255, 0.35); background: rgba(100, 160, 255, 0.03); font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
         .sales-detail-table td { padding: 12px; color: rgba(180, 210, 255, 0.68); font-size: 12.5px; border-top: 1px solid rgba(100, 160, 255, 0.05); }
@@ -34,6 +36,7 @@ function SalesDetailModal({ isOpen, onClose, transaction }) {
         .sales-detail-number { text-align: right; font-variant-numeric: tabular-nums; }
         .sales-detail-total { display: flex; justify-content: flex-end; align-items: center; gap: 14px; padding-top: 14px; color: rgba(180, 210, 255, 0.4); font-size: 12px; }
         .sales-detail-total strong { color: white; font-size: 16px; }
+        .loading-overlay-modal { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; color: #7eb8ff; gap: 10px; }
         @media (max-width: 640px) { .sales-detail-meta { grid-template-columns: 1fr; } .sales-detail-table-wrap { overflow-x: auto; } .sales-detail-table { min-width: 540px; } }
       `}</style>
 
@@ -44,7 +47,7 @@ function SalesDetailModal({ isOpen, onClose, transaction }) {
               <div className="sales-detail-icon"><ReceiptText size={17} /></div>
               <div>
                 <h2 className="sales-detail-title">Sales Detail</h2>
-                <p className="sales-detail-subtitle">{transaction.transNo}</p>
+                <p className="sales-detail-subtitle">#{transaction.trans_no || transaction.transNo}</p>
               </div>
             </div>
             <button className="sales-detail-close" onClick={onClose} title="Close"><X size={15} /></button>
@@ -52,30 +55,68 @@ function SalesDetailModal({ isOpen, onClose, transaction }) {
 
           <div className="sales-detail-body">
             <div className="sales-detail-meta">
-              <div className="sales-detail-meta-item"><span className="sales-detail-label">Transaction</span><span className="sales-detail-value">{transaction.transNo}</span></div>
-              <div className="sales-detail-meta-item"><span className="sales-detail-label">Sales Date</span><span className="sales-detail-value">{transaction.salesDate}</span></div>
-              <div className="sales-detail-meta-item"><span className="sales-detail-label">Employee</span><span className="sales-detail-value">{transaction.empNo}</span></div>
+              <div className="sales-detail-meta-item">
+                <span className="sales-detail-label">Transaction</span>
+                <span className="sales-detail-value">{transaction.trans_no || transaction.transNo}</span>
+              </div>
+              <div className="sales-detail-meta-item">
+                <span className="sales-detail-label">Sales Date</span>
+                <span className="sales-detail-value">
+                  {new Date(transaction.sales_date || transaction.salesDate).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="sales-detail-meta-item">
+                <span className="sales-detail-label">Employee ID</span>
+                <span className="sales-detail-value">{transaction.emp_no || transaction.empNo}</span>
+              </div>
             </div>
 
             <div className="sales-detail-table-wrap">
-              <table className="sales-detail-table">
-                <thead>
-                  <tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr>
-                </thead>
-                <tbody>
-                  {transaction.items.map((item) => (
-                    <tr key={`${transaction.transNo}-${item.prodCode}`}>
-                      <td className="sales-detail-product">{item.description}</td>
-                      <td className="sales-detail-number">{item.quantity}</td>
-                      <td className="sales-detail-number">{formatCurrency(item.unitPrice)}</td>
-                      <td className="sales-detail-number">{formatCurrency(item.quantity * item.unitPrice)}</td>
+              {isLoading ? (
+                <div className="loading-overlay-modal">
+                  <Loader2 className="animate-spin" size={24} />
+                  <span>Loading items...</span>
+                </div>
+              ) : (
+                <table className="sales-detail-table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th style={{ textAlign: 'center' }}>Qty</th>
+                      <th>Unit</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {details && details.length > 0 ? (
+                      details.map((item, idx) => (
+                        <tr key={idx}>
+                          {/* REACH INTO THE JOINED PRODUCT OBJECT */}
+                          <td className="sales-detail-product">
+                            {item.product?.description || item.prodCode}
+                          </td>
+                          <td className="sales-detail-number" style={{ textAlign: 'center' }}>
+                            {item.quantity}
+                          </td>
+                          <td className="sales-detail-number" style={{ textAlign: 'left' }}>
+                            {item.product?.unit || '-'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} style={{ textAlign: 'center', padding: '20px' }}>
+                          No line items found for this transaction.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
 
-            <div className="sales-detail-total">Transaction Total <strong>{formatCurrency(total)}</strong></div>
+            <div className="sales-detail-total">
+              Transaction Total <strong>{formatCurrency(displayTotal)}</strong>
+            </div>
           </div>
         </div>
       </div>

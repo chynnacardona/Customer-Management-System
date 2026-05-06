@@ -1,16 +1,33 @@
 import { useState } from 'react'
-import { CalendarDays, ChevronRight, ReceiptText } from 'lucide-react'
+import { CalendarDays, ChevronRight, ReceiptText, Loader2 } from 'lucide-react'
 import SalesDetailModal from './SalesDetailModal'
+import { getSalesDetail } from '../../services/salesProductApi' // 1. Import the API
 
 function SalesHistoryPanel({ transactions }) {
+  // 2. Added these states to hold the "Actual" info from the DB
   const [selectedTransaction, setSelectedTransaction] = useState(null)
+  const [details, setDetails] = useState([]) 
+  const [loadingDetail, setLoadingDetail] = useState(false)
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value)
 
-  const getTransactionTotal = (transaction) =>
-    transaction.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
-
+  // 3. Updated Logic to fetch from database when a row is clicked
+  const handleOpenDetail = async (transaction) => {
+    setSelectedTransaction(transaction) // Open the modal immediately
+    setLoadingDetail(true)
+    setDetails([]) // Clear old items
+    
+    try {
+      // transaction.trans_no comes from your Supabase 'sales' table
+      const data = await getSalesDetail(transaction.trans_no || transaction.transNo)
+      setDetails(data) // Now 'details' contains real product descriptions!
+    } catch (err) {
+      console.error("Error fetching line items:", err.message)
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
   return (
     <>
       <style>{`
@@ -39,7 +56,7 @@ function SalesHistoryPanel({ transactions }) {
             <div className="sales-history-icon"><ReceiptText size={16} /></div>
             <div>
               <h2 className="sales-history-title">Sales History</h2>
-              <p className="sales-history-subtitle">{transactions.length} {transactions.length === 1 ? 'transaction' : 'transactions'} recorded</p>
+              <p className="sales-history-subtitle">{transactions.length} records</p>
             </div>
           </div>
         </div>
@@ -50,26 +67,50 @@ function SalesHistoryPanel({ transactions }) {
           <div className="sales-history-scroll">
             <table className="sales-history-table">
               <thead>
-                <tr><th>Trans No.</th><th>Sales Date</th><th>Employee</th><th>Items</th><th style={{ textAlign: 'right' }}>Total</th><th aria-label="Open detail" /></tr>
+                <tr>
+                  <th>Trans No.</th>
+                  <th>Sales Date</th>
+                  <th>Employee</th>
+                  <th style={{ textAlign: 'right' }}>Total</th>
+                  <th aria-label="Open detail" />
+                </tr>
               </thead>
               <tbody>
-                {transactions.map((transaction) => (
-                  <tr key={transaction.transNo} className="sales-history-row" onClick={() => setSelectedTransaction(transaction)}>
-                    <td className="sales-history-trans">{transaction.transNo}</td>
-                    <td><span className="sales-history-date"><CalendarDays size={12} />{transaction.salesDate}</span></td>
-                    <td>{transaction.empNo}</td>
-                    <td>{transaction.items.length}</td>
-                    <td className="sales-history-total">{formatCurrency(getTransactionTotal(transaction))}</td>
-                    <td className="sales-history-open"><ChevronRight size={14} /></td>
-                  </tr>
-                ))}
-              </tbody>
+                  {transactions.map((ts, index) => (
+                    <tr 
+                      key={ts.transno || ts.trans_no || index} 
+                      className="sales-history-row" 
+                      onClick={() => handleOpenDetail(ts)}
+                    >
+                      <td className="sales-history-trans">{ts.transno || ts.trans_no}</td>
+                      <td>
+                        <span className="sales-history-date">
+                          <CalendarDays size={12} />
+                          {/* Use lowercase salesdate */}
+                          {new Date(ts.salesdate || ts.sales_date).toLocaleDateString()}
+                        </span>
+                      </td>
+                      <td>{ts.empno || ts.emp_no}</td>
+                      <td className="sales-history-total">
+                        {formatCurrency(ts.totalamount || ts.total_amount || 0)}
+                      </td>
+                      <td className="sales-history-open"><ChevronRight size={14} /></td>
+                    </tr>
+                  ))}
+                </tbody>
             </table>
           </div>
         )}
       </section>
 
-      <SalesDetailModal isOpen={Boolean(selectedTransaction)} transaction={selectedTransaction} onClose={() => setSelectedTransaction(null)} />
+      {/* 6. Pass the live 'details' and 'loading' status to the Modal */}
+      <SalesDetailModal 
+        isOpen={Boolean(selectedTransaction)} 
+        transaction={selectedTransaction} 
+        details={details} 
+        isLoading={loadingDetail}
+        onClose={() => setSelectedTransaction(null)} 
+      />
     </>
   )
 }
