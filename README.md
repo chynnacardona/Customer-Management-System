@@ -42,8 +42,8 @@
    ```
    
 3. Open your .env file and fill in the values:
-   - VITE_SUPABASE_URL — get this from your Supabase project dashboard
-   - VITE_SUPABASE_ANON_KEY — also from your Supabase dashboard
+   - VITE_SUPABASE_URL — get the URL from M3 or Supabase Dashboard 
+   - VITE_SUPABASE_ANON_KEY — also from M3 or Supabase dashboard
 
 ## Running the App
    
