@@ -39,16 +39,21 @@ export const softDeleteCustomer = async (custno) => {
   if (error) throw error;
 };
 
-export const getSalesDetail = async (transNo) => {
+export const getSalesDetail = async (transno) => {
+  // Use lowercase 'salesdetail' and 'product' to match PostgreSQL
   const { data, error } = await supabase
-    .from('salesdetail') // Change from 'salesDetail' to 'salesdetail'
+    .from('salesdetail') 
     .select(`
       quantity,
       prodcode,
-      product (description, unit)
+      product (
+        description,
+        unit,
+        pricehist (unitprice)
+      )
     `)
-    .eq('transno', transNo); // Change from 'transNo' to 'transno'
-  
+    .eq('transno', transno);
+
   if (error) throw error;
   return data;
 };
