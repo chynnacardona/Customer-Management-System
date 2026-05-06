@@ -1,0 +1,1 @@
+export default function DeletedCustomers() { return <div>Deleted Customers</div> }
