@@ -67,7 +67,7 @@ export const getProducts = async () => {
       unit,
       pricehist (unitprice, effdate)
     `)
-    // We order the nested table to get the newest price first
+    // Standardize to lowercase and order pricehist to get newest first
     .order('effdate', { foreignTable: 'pricehist', ascending: false });
 
   if (error) throw error;
@@ -77,12 +77,13 @@ export const getProducts = async () => {
 export const getCurrentPrice = async (prodCode) => {
   const { data, error } = await supabase
     .from('pricehist')
-    .select('unitprice')
+    .select('unitprice') // Changed from unit_price to match your schema
     .eq('prodcode', prodCode)
     .order('effdate', { ascending: false })
     .limit(1)
     .single();
+    
   if (error && error.code !== 'PGRST116') throw error;
-  return data?.unit_price || 0;
+  return data?.unitprice || 0; // Match the column name here too
 };
 
