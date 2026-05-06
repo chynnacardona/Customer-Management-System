@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Search, Eye, Edit, Trash2, Plus, ChevronLeft, ChevronRight, UserCheck } from 'lucide-react'
 import AddCustomerModal from '../../components/shared/AddCustomerModal'
 import EditCustomerModal from '../../components/shared/EditCustomerModal'
@@ -23,6 +24,7 @@ const DUMMY_CUSTOMERS = [
 const ROWS_OPTIONS = [5, 10, 15, 20]
 
 function CustomerListPage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
@@ -46,6 +48,11 @@ function CustomerListPage() {
   const handleSearch = (e) => {
     setSearch(e.target.value)
     setCurrentPage(1)
+  }
+
+  const handleViewClick = (e, customer) => {
+    e.stopPropagation()
+    navigate(`/customers/${customer.custno}`)
   }
 
   const handleEditClick = (e, customer) => {
@@ -447,7 +454,7 @@ function CustomerListPage() {
                           <button
                             className="action-btn view"
                             title="View"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => handleViewClick(e, customer)}
                           >
                             <Eye size={13} />
                           </button>
@@ -494,7 +501,7 @@ function CustomerListPage() {
               </select>
             </div>
             <div className="pagination-right">
-              {startIndex + 1}–{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems}
+              {startIndex + 1}-{Math.min(startIndex + rowsPerPage, totalItems)} of {totalItems}
               <button
                 className="page-btn"
                 onClick={() => setCurrentPage(p => p - 1)}
@@ -537,3 +544,4 @@ function CustomerListPage() {
 }
 
 export default CustomerListPage
+
