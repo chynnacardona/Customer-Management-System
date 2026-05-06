@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase/supabaseClient";
 
 const AuthContext = createContext({});
@@ -6,6 +6,7 @@ const AuthContext = createContext({});
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const missingProfileWarnedRef = useRef(false);
 
   const handleLogin = async (emailInput) => {
     const { error } = await supabase.auth.signInWithOtp({
@@ -23,52 +24,96 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      // Tally with Screenshot 4.2 naming
-      const { data: userRow, error } = await supabase
+      // para kay M4: dito papasok yung final login guard/profile query behavior
+      const profileQuery = supabase
         .from('user')
         .select('record_status, user_type, email, full_name')
-        .eq('userId', sessionUser.id) 
-        .single();
+        .eq('userId', sessionUser.id)
+        .maybeSingle();
 
-      if (error || !userRow) {
-        console.warn("User record not found. Allowing entry for setup.");
+      const timeout = new Promise((resolve) => {
+        setTimeout(() => resolve({ data: null, error: new Error('Profile lookup timeout') }), 5000);
+      });
+
+      const { data: userRow, error } = await Promise.race([profileQuery, timeout]);
+
+      if (error) {
+        console.warn("Unable to load user profile. Allowing entry for setup.", error);
         setUser(sessionUser);
         return;
       }
 
-      // Login Guard Check (Screenshot 4.2)
+      if (!userRow) {
+        if (!missingProfileWarnedRef.current) {
+          console.warn("User profile row not found yet. Allowing entry for UI testing.");
+          missingProfileWarnedRef.current = true;
+        }
+        setUser(sessionUser);
+        return;
+      }
+
       if (userRow.record_status !== 'ACTIVE') {
-        await supabase.auth.signOut();
         setUser(null);
-        alert("Your account is pending activation by a Sales Manager.");
+        setTimeout(() => {
+          supabase.auth.signOut();
+          alert("Your account is pending activation by a Sales Manager.");
+        }, 0);
         return;
       }
 
       setUser({ ...sessionUser, ...userRow });
     } catch (err) {
+      console.warn("Unable to load user profile. Allowing entry for setup.", err);
       setUser(sessionUser);
     }
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) checkAndSetUser(session.user).finally(() => setLoading(false));
-      else setLoading(false);
+    let mounted = true;
+
+    const loadInitialSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
+
+        if (session?.user) await checkAndSetUser(session.user);
+        else setUser(null);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    loadInitialSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Supabase recommends not awaiting extra Supabase calls directly inside this callback.
+      setTimeout(() => {
+        if (session?.user) checkAndSetUser(session.user);
+        else setUser(null);
+      }, 0);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setLoading(true);
-      if (session?.user) await checkAndSetUser(session.user);
-      else setUser(null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
     <AuthContext.Provider value={{ user, loading, handleLogin, signOut: () => supabase.auth.signOut() }}>
-      {!loading && children}
+      {loading ? (
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(160deg, #020818 0%, #051030 50%, #060d28 100%)',
+          color: 'rgba(180,210,255,0.75)',
+          fontSize: '13px',
+        }}>
+          Restoring session...
+        </div>
+      ) : children}
     </AuthContext.Provider>
   );
 };
