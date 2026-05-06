@@ -22,9 +22,9 @@ function Sidebar() {
     {
       label: 'Management',
       items: [
-        { icon: Users, label: 'Customers', path: '/lookups/customers' },
+        { icon: Users, label: 'Customers', path: '/customers' },
         { icon: ShoppingCart, label: 'Sales', path: '/sales' },
-        { icon: Package, label: 'Products', path: '/lookups/products' },
+        { icon: Package, label: 'Products', path: '/products' },
       ]
     },
     {
