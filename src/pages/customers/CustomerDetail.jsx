@@ -54,9 +54,23 @@ function CustomerDetailPage() {
     return colors[term] || { bg: 'transparent', color: 'white', border: 'transparent' }
   }
 
-  // UPDATED: Calculate Total Spend using the 'total_amount' column from Supabase
-  const totalSpend = transactions.reduce((sum, ts) => sum + (Number(ts.total_amount) || 0), 0)
-  const formattedTotal = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(totalSpend)
+  const totalSpend = transactions.reduce((sum, ts) => {
+  // 1. Calculate the total for ONE transaction
+  const transactionTotal = (ts.salesdetail || []).reduce((tSum, item) => {
+    // Get the latest price from the pricehist array inside the product
+    const price = item.product?.pricehist?.[0]?.unitprice || 0;
+    const lineTotal = Number(item.quantity) * Number(price);
+    return tSum + lineTotal;
+  }, 0);
+
+  // 2. Add this transaction's total to the Customer's grand total
+  return sum + transactionTotal;
+}, 0);
+
+const formattedTotal = new Intl.NumberFormat('en-PH', { 
+  style: 'currency', 
+  currency: 'PHP' 
+}).format(totalSpend);
 
   if (loading) {
     return (

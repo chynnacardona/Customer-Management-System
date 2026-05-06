@@ -76,27 +76,24 @@ function SalesHistoryPanel({ transactions }) {
                 </tr>
               </thead>
               <tbody>
-                  {transactions.map((ts, index) => (
-                    <tr 
-                      key={ts.transno || ts.trans_no || index} 
-                      className="sales-history-row" 
-                      onClick={() => handleOpenDetail(ts)}
-                    >
-                      <td className="sales-history-trans">{ts.transno || ts.trans_no}</td>
-                      <td>
-                        <span className="sales-history-date">
-                          <CalendarDays size={12} />
-                          {/* Use lowercase salesdate */}
-                          {new Date(ts.salesdate || ts.sales_date).toLocaleDateString()}
-                        </span>
-                      </td>
-                      <td>{ts.empno || ts.emp_no}</td>
-                      <td className="sales-history-total">
-                        {formatCurrency(ts.totalamount || ts.total_amount || 0)}
-                      </td>
-                      <td className="sales-history-open"><ChevronRight size={14} /></td>
-                    </tr>
-                  ))}
+                 {transactions.map((ts) => {
+                    // Calculate the money total for this specific row
+                    const rowTotal = ts.salesdetail?.reduce((acc, item) => {
+                      const p = item.product?.pricehist?.[0]?.unitprice || 0;
+                      return acc + (Number(item.quantity) * p);
+                    }, 0);
+
+                    return (
+                      <tr key={ts.transno} className="sales-history-row" onClick={() => handleOpenDetail(ts)}>
+                        <td className="sales-history-trans">{ts.transno}</td>
+                        <td>{new Date(ts.salesdate).toLocaleDateString()}</td>
+                        <td>{ts.salesdetail?.length || 0} Items</td>
+                        <td className="sales-history-total" style={{ fontWeight: 'bold', color: '#4ade80' }}>
+                          {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(rowTotal)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
             </table>
           </div>
