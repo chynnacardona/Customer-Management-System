@@ -1,104 +1,98 @@
-import { useMemo } from 'react'
+import { useEffect, useState } from 'react' 
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, BadgeCheck, CreditCard, MapPin, UserRound } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, CreditCard, MapPin, UserRound, Loader2 } from 'lucide-react'
 import SalesHistoryPanel from '../../components/shared/SalesHistoryPanel'
-
-// para kay M1: palitan ito ng getCustomerByCustno(custno) API call kapag ready na service layer
-const DUMMY_CUSTOMERS = [
-  { custno: 'C0001', custname: 'Juan dela Cruz', address: 'Manila', payterm: 'COD', record_status: 'ACTIVE' },
-  { custno: 'C0002', custname: 'Maria Santos', address: 'Quezon City', payterm: '30D', record_status: 'ACTIVE' },
-  { custno: 'C0003', custname: 'Pedro Reyes', address: 'Makati', payterm: '45D', record_status: 'ACTIVE' },
-  { custno: 'C0004', custname: 'Ana Gonzales', address: 'Pasig', payterm: 'COD', record_status: 'ACTIVE' },
-  { custno: 'C0005', custname: 'Jose Ramirez', address: 'Taguig', payterm: '30D', record_status: 'ACTIVE' },
-  { custno: 'C0006', custname: 'Luz Fernandez', address: 'Mandaluyong', payterm: 'COD', record_status: 'ACTIVE' },
-]
-
-// para kay M1: palitan ito ng getSalesByCustomer(custno) at getSalesDetail(transNo)
-const DUMMY_SALES = [
-  {
-    transNo: 'TR000001',
-    custNo: 'C0001',
-    salesDate: '2026-03-05',
-    empNo: 'E0001',
-    items: [
-      { prodCode: 'AK0001', description: 'All-Purpose Cleaner', quantity: 4, unitPrice: 145 },
-      { prodCode: 'AK0004', description: 'Dishwashing Liquid', quantity: 2, unitPrice: 210 },
-    ],
-  },
-  {
-    transNo: 'TR000014',
-    custNo: 'C0001',
-    salesDate: '2026-03-22',
-    empNo: 'E0003',
-    items: [
-      { prodCode: 'AK0010', description: 'Laundry Powder', quantity: 3, unitPrice: 280 },
-      { prodCode: 'AK0022', description: 'Fabric Conditioner', quantity: 2, unitPrice: 195 },
-      { prodCode: 'AK0031', description: 'Hand Soap Refill', quantity: 6, unitPrice: 89 },
-    ],
-  },
-  {
-    transNo: 'TR000023',
-    custNo: 'C0002',
-    salesDate: '2026-03-11',
-    empNo: 'E0002',
-    items: [
-      { prodCode: 'AK0005', description: 'Glass Cleaner', quantity: 5, unitPrice: 132 },
-      { prodCode: 'AK0011', description: 'Floor Wax', quantity: 1, unitPrice: 510 },
-    ],
-  },
-  {
-    transNo: 'TR000029',
-    custNo: 'C0003',
-    salesDate: '2026-04-01',
-    empNo: 'E0004',
-    items: [
-      { prodCode: 'AK0008', description: 'Bathroom Disinfectant', quantity: 2, unitPrice: 245 },
-    ],
-  },
-  {
-    transNo: 'TR000038',
-    custNo: 'C0004',
-    salesDate: '2026-04-09',
-    empNo: 'E0001',
-    items: [
-      { prodCode: 'AK0020', description: 'Kitchen Degreaser', quantity: 4, unitPrice: 165 },
-      { prodCode: 'AK0024', description: 'Paper Towels', quantity: 8, unitPrice: 74 },
-    ],
-  },
-]
+import { getSalesByCustomer } from '../../services/salesProductApi' 
+import { supabase } from '../../supabase/supabaseClient'
 
 function CustomerDetailPage() {
   const { custno } = useParams()
   const navigate = useNavigate()
 
-  const customer = useMemo(() => DUMMY_CUSTOMERS.find((item) => item.custno === custno), [custno])
-  const transactions = useMemo(() => DUMMY_SALES.filter((item) => item.custNo === custno), [custno])
+  // --- LIVE DATA STATES ---
+  const [customer, setCustomer] = useState(null)
+  const [transactions, setTransactions] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchFullDetails = async () => {
+      try {
+        setLoading(true)
+        
+        // 1. Fetch Customer Profile
+        // Note: Using 'custno' to match your URL param and database column
+        const { data: custData, error: custErr } = await supabase
+          .from('customer')
+          .select('*')
+          .eq('custno', custno)
+          .single()
+
+        if (custErr) throw custErr
+        setCustomer(custData)
+
+        // 2. Fetch Sales History via M2's PR-02 Service
+        // This calls the 'sales' table in Supabase
+        const salesData = await getSalesByCustomer(custno)
+        setTransactions(salesData || [])
+
+      } catch (err) {
+        console.error("Error loading customer details:", err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (custno) fetchFullDetails()
+  }, [custno])
 
   const paytermColor = (term) => {
-    if (term === 'COD') return { bg: 'rgba(34, 197, 94, 0.1)', color: '#4ade80', border: 'rgba(34, 197, 94, 0.2)' }
-    if (term === '30D') return { bg: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', border: 'rgba(59, 130, 246, 0.2)' }
-    if (term === '45D') return { bg: 'rgba(168, 85, 247, 0.1)', color: '#c084fc', border: 'rgba(168, 85, 247, 0.2)' }
-    return { bg: 'transparent', color: 'white', border: 'transparent' }
+    const colors = {
+      'COD': { bg: 'rgba(34, 197, 94, 0.1)', color: '#4ade80', border: 'rgba(34, 197, 94, 0.2)' },
+      '30D': { bg: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', border: 'rgba(59, 130, 246, 0.2)' },
+      '45D': { bg: 'rgba(168, 85, 247, 0.1)', color: '#c084fc', border: 'rgba(168, 85, 247, 0.2)' }
+    }
+    return colors[term] || { bg: 'transparent', color: 'white', border: 'transparent' }
+  }
+
+  const totalSpend = transactions.reduce((sum, ts) => {
+  // 1. Calculate the total for ONE transaction
+  const transactionTotal = (ts.salesdetail || []).reduce((tSum, item) => {
+    // Get the latest price from the pricehist array inside the product
+    const price = item.product?.pricehist?.[0]?.unitprice || 0;
+    const lineTotal = Number(item.quantity) * Number(price);
+    return tSum + lineTotal;
+  }, 0);
+
+  // 2. Add this transaction's total to the Customer's grand total
+  return sum + transactionTotal;
+}, 0);
+
+const formattedTotal = new Intl.NumberFormat('en-PH', { 
+  style: 'currency', 
+  currency: 'PHP' 
+}).format(totalSpend);
+
+  if (loading) {
+    return (
+      <div className="detail-empty-state" style={{ padding: '100px 0' }}>
+        <Loader2 className="animate-spin mb-3 mx-auto text-blue-400" size={32} />
+        <p>Loading database records...</p>
+      </div>
+    )
   }
 
   if (!customer) {
     return (
-      <>
-        <style>{pageStyles}</style>
-        <div className="customer-detail-page">
+      <div className="customer-detail-page">
+        <div className="detail-topbar">
           <button className="detail-back-btn" onClick={() => navigate('/customers')}><ArrowLeft size={14} />Back to Customers</button>
-          <div className="detail-empty-state">Customer not found</div>
         </div>
-      </>
+        <div className="detail-empty-state">Customer {custno} not found in database.</div>
+      </div>
     )
   }
 
   const badge = paytermColor(customer.payterm)
-  const totalSpend = transactions.reduce(
-    (sum, transaction) => sum + transaction.items.reduce((itemSum, item) => itemSum + item.quantity * item.unitPrice, 0),
-    0
-  )
-  const formattedTotal = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(totalSpend)
 
   return (
     <>
@@ -117,17 +111,47 @@ function CustomerDetailPage() {
                 <p className="detail-kicker">{customer.custno}</p>
                 <h1 className="detail-title">{customer.custname}</h1>
               </div>
-              <span className="detail-status"><BadgeCheck size={13} />{customer.record_status}</span>
+              <span className="detail-status">
+                <BadgeCheck size={13} />
+                {customer.record_status || 'ACTIVE'}
+              </span>
             </div>
 
             <div className="detail-meta-grid">
-              <div className="detail-meta-card"><MapPin size={15} /><div><span className="detail-meta-label">Address</span><strong>{customer.address}</strong></div></div>
-              <div className="detail-meta-card"><CreditCard size={15} /><div><span className="detail-meta-label">Pay Term</span><span className="detail-payterm-badge" style={{ background: badge.bg, color: badge.color, borderColor: badge.border }}>{customer.payterm}</span></div></div>
-              <div className="detail-meta-card"><CreditCard size={15} /><div><span className="detail-meta-label">Total Spend</span><strong>{formattedTotal}</strong></div></div>
+              <div className="detail-meta-card">
+                <MapPin size={15} />
+                <div>
+                  <span className="detail-meta-label">Address</span>
+                  <strong>{customer.address}</strong>
+                </div>
+              </div>
+              <div className="detail-meta-card">
+                <CreditCard size={15} />
+                <div>
+                  <span className="detail-meta-label">Pay Term</span>
+                  <span className="detail-payterm-badge" style={{ 
+                    background: badge.bg, 
+                    color: badge.color, 
+                    borderColor: badge.border 
+                  }}>
+                    {customer.payterm}
+                  </span>
+                </div>
+              </div>
+              <div className="detail-meta-card">
+                <CreditCard size={15} />
+                <div>
+                  <span className="detail-meta-label">Total Spend</span>
+                  <strong>{formattedTotal}</strong>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
+        {/* This passes the live 'transactions' array to the panel.
+           The panel will now use database fields like 'trans_no' and 'sales_date'.
+        */}
         <SalesHistoryPanel transactions={transactions} />
       </div>
     </>

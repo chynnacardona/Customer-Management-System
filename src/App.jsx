@@ -24,36 +24,24 @@ function App() {
 
         {/* Protected Application Routes */}
         <Route
-          path="/*"
+          path="/"
           element={
             <ProtectedRoute>
-              <AppShell>
-                <Routes>
-                  {/* Default redirect inside the AppShell */}
-                  <Route path="/" element={<Navigate to="/customers" replace />} />
-                  
-                  <Route path="customers" element={<CustomerList />} />
-                  <Route path="customers/:id" element={<CustomerDetail />} />
-                  <Route path="sales" element={<SalesList />} />
-                  <Route path="products" element={<ProductCatalog />} />
-                  <Route path="admin" element={<UserManagement />} />
-                  <Route path="deleted-customers" element={<DeletedCustomers />} />
-                  
-                  <Route path="dashboard" element={
-                      <div style={{ padding: "20px" }}>
-                        <p style={{ color: "rgba(180,210,255,0.4)", fontSize: "13px" }}>
-                          Dashboard content here
-                        </p>
-                      </div>
-                  } />
-
-                  {/* Fallback for unknown routes inside the Shell */}
-                  <Route path="*" element={<Navigate to="/customers" replace />} />
-                </Routes>
-              </AppShell>
+              <AppShell /> 
             </ProtectedRoute>
           }
-        />
+        >
+  
+          <Route index element={<Navigate to="/customers" replace />} />
+          <Route path="customers" element={<CustomerList />} />
+          <Route path="customers/:custno" element={<CustomerDetail />} />
+          <Route path="sales" element={<SalesList />} />
+          <Route path="products" element={<ProductCatalog />} />
+          <Route path="admin" element={<UserManagement />} />
+          <Route path="deleted-customers" element={<DeletedCustomers />} />
+          
+          <Route path="*" element={<Navigate to="/customers" replace />} />
+        </Route>
       </Routes>
     </AuthProvider>
   );

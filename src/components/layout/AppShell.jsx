@@ -1,23 +1,18 @@
 import React from 'react';
+import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import ParticlesBg from './ParticlesBg';
 
-const AppShell = ({ children }) => {
+const AppShell = () => {
   return (
     <div style={shellStyles.container}>
-      {/* 1. Background Animation para sa buong Dashboard */}
       <ParticlesBg />
-
-      {/* 2. Sidebar sa gilid */}
       <Sidebar />
-
-      {/* 3. Main Content Area */}
       <main style={shellStyles.mainContent}>
-        {children}
-        
+        {/* This is where your nested pages will appear */}
+        <Outlet /> 
       </main>
     </div>
-    
   );
 };
 
