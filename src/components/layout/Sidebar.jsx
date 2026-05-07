@@ -1,15 +1,27 @@
 import { useState } from 'react'
-import { Users, ShoppingCart, Package, ShieldCheck, LayoutDashboard, Search, LogOut, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
-import { useAuth } from '../../context/AuthContext'
+import {
+  ChevronLeft,
+  ChevronRight,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  ShieldCheck,
+  ShoppingCart,
+  Trash2,
+  Users,
+} from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/useAuth'
 import neuLogo from '../../assets/neu-logo.png'
 
 function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
-  const { user: authUser } = useAuth()
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const navigate = useNavigate()
+  const { user: authUser, signOut } = useAuth()
 
-  // para kay M4: palitan/ikabit sa final AuthContext or UserRightsContext user_type value kapag finalized na
-  const userType = authUser?.user_type ?? 'ADMIN'
+  const userType = authUser?.user_type ?? 'USER'
   const canViewDeletedCustomers = userType === 'ADMIN' || userType === 'SUPERADMIN'
 
   const sections = [
@@ -17,7 +29,7 @@ function Sidebar() {
       label: 'Overview',
       items: [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-      ]
+      ],
     },
     {
       label: 'Management',
@@ -25,25 +37,41 @@ function Sidebar() {
         { icon: Users, label: 'Customers', path: '/customers' },
         { icon: ShoppingCart, label: 'Sales', path: '/sales' },
         { icon: Package, label: 'Products', path: '/products' },
-      ]
+      ],
     },
     {
       label: 'System',
       items: [
         { icon: ShieldCheck, label: 'Admin', path: '/admin' },
-        // para kay M4: hidden dapat ito kapag USER; ADMIN/SUPERADMIN lang ang may Deleted Customers access
         ...(canViewDeletedCustomers
           ? [{ icon: Trash2, label: 'Deleted Customers', path: '/deleted-customers' }]
           : []),
-      ]
+      ],
     },
   ]
 
-  // para kay M4: palitan display fields kapag final user profile fields are ready
   const user = {
+    name: authUser?.full_name ?? authUser?.user_metadata?.full_name ?? 'Hope User',
     email: authUser?.email ?? 'admin@hope.com',
-    initials: authUser?.email?.charAt(0).toUpperCase() ?? 'A',
+    initials: (authUser?.full_name ?? authUser?.email ?? 'A')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join('') || 'A',
     role: userType,
+  }
+
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true)
+      await signOut()
+      setShowLogoutConfirm(false)
+      navigate('/login', { replace: true })
+    } catch (err) {
+      console.error('Sign out failed:', err)
+      setIsSigningOut(false)
+    }
   }
 
   return (
@@ -55,495 +83,556 @@ function Sidebar() {
         }
 
         .sidebar {
-          width: ${collapsed ? '68px' : '245px'};
-          min-height: 100vh;
-          background: rgba(4, 9, 22, 0.25); 
-          backdrop-filter: blur(18px) saturate(160%) brightness(0.9);
-          -webkit-backdrop-filter: blur(18px) saturate(160%) brightness(0.9);
-          
-          border-right: 1px solid transparent;
-          border-image: linear-gradient(
-            to bottom,
-            transparent 0%,
-            rgba(100, 160, 255, 0.1) 15%,
-            rgba(100, 160, 255, 0.3) 50%,
-            rgba(100, 160, 255, 0.1) 85%,
-            transparent 100%
-          ) 1;
-
-          box-shadow: 4px 0 20px rgba(100, 160, 255, 0.05);
-
+          width: ${collapsed ? '76px' : '248px'};
+          height: calc(100vh - 28px);
+          margin: 14px 0 14px 14px;
+          flex-shrink: 0;
+          position: relative;
+          z-index: 20;
           display: flex;
           flex-direction: column;
-          flex-shrink: 0;
-          /* transition: all para pati colors at shadows sumabay */
-          transition: all 0.32s cubic-bezier(0.4, 0, 0.2, 1);
-          overflow: visible;
-          position: relative;
+          padding: 14px 10px;
+          box-sizing: border-box;
+          animation: sidebarIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          background: linear-gradient(180deg, rgba(8, 18, 40, 0.82), rgba(3, 9, 24, 0.9));
+          border: 1px solid rgba(126, 184, 255, 0.12);
+          border-radius: 20px;
+          box-shadow: 12px 0 34px rgba(0, 0, 0, 0.22);
+          backdrop-filter: blur(26px) saturate(150%);
+          -webkit-backdrop-filter: blur(26px) saturate(150%);
+          transition:
+            width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            margin 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            background 0.24s ease,
+            box-shadow 0.24s ease;
         }
 
-        /* Para magmukhang tunay na glass edge na tinatamaan ng nebula light */
         .sidebar::after {
           content: '';
           position: absolute;
-          top: 10%;
+          top: 18px;
           right: -1px;
-          height: 80%;
           width: 1px;
-          background: linear-gradient(to bottom, 
-            transparent, 
-            rgba(255, 255, 255, 0.15), 
-            transparent
+          height: calc(100% - 36px);
+          border-radius: 999px;
+          background: linear-gradient(
+            180deg,
+            transparent 0%,
+            rgba(126, 184, 255, 0.18) 18%,
+            rgba(56, 189, 248, 0.62) 50%,
+            rgba(52, 211, 153, 0.18) 82%,
+            transparent 100%
           );
+          box-shadow: 0 0 14px rgba(56, 189, 248, 0.34);
           pointer-events: none;
         }
 
-        /* Toggle button — center of right edge */
-        .toggle-btn {
+        .sidebar-toggle {
           position: absolute;
-          right: -14px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          background: rgba(14, 40, 100, 0.95);
-          border: 1px solid rgba(100, 160, 255, 0.25);
-          display: flex;
+          right: -11px;
+          top: 82px;
+          width: 24px;
+          height: 38px;
+          display: inline-flex;
           align-items: center;
           justify-content: center;
+          border-radius: 10px;
+          border: 1px solid rgba(126, 184, 255, 0.16);
+          background: rgba(7, 18, 42, 0.96);
+          color: rgba(180, 210, 255, 0.46);
           cursor: pointer;
-          color: rgba(180, 210, 255, 0.75);
-          z-index: 50;
-          transition: all 0.2s ease;
-          box-shadow: 0 0 0 3px rgba(4, 9, 22, 0.97), 0 4px 14px rgba(0,0,0,0.4);
+          z-index: 80;
+          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18), 0 0 0 2px rgba(4, 9, 22, 0.86);
+          transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .toggle-btn:hover {
-          background: rgba(46, 134, 245, 0.9);
-          border-color: rgba(100, 160, 255, 0.5);
-          color: white;
-          box-shadow: 0 0 0 3px rgba(4, 9, 22, 0.97), 0 0 16px rgba(46,134,245,0.4);
+        .sidebar-toggle:hover {
+          transform: translateX(${collapsed ? '1px' : '-1px'});
+          border-color: rgba(126, 184, 255, 0.34);
+          background: rgba(18, 40, 82, 0.96);
+          color: rgba(230, 244, 255, 0.86);
+          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22), 0 0 0 2px rgba(4, 9, 22, 0.86);
+        }
+
+        .sidebar-toggle:focus-visible {
+          outline: 2px solid rgba(126, 184, 255, 0.9);
+          outline-offset: 3px;
         }
 
         .sidebar-header {
-          /* Siguraduhin na 64px ang height para pantay sa 40px logo */
-          min-height: 64px; 
+          min-height: 70px;
           display: flex;
           align-items: center;
-          /* Kapag collapsed, dapat center. Kapag hindi, flex-start */
-          justify-content: ${collapsed ? 'center' : 'flex-start'};
-          /* Dagdagan natin ang horizontal padding para hindi dikit sa edge */
-          padding: 0 ${collapsed ? '0' : '20px'};
-          gap: 1px;
-          transition: all 0.3s ease;
-          overflow: hidden;
+          justify-content: ${collapsed ? 'center' : 'space-between'};
+          gap: 12px;
+          padding: ${collapsed ? '13px 8px' : '13px 8px'};
+          box-sizing: border-box;
+          transition:
+            padding 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            justify-content 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .header-accent {
+          height: 1px;
+          margin: ${collapsed ? '2px 18px 10px' : '2px 18px 10px'};
+          background: linear-gradient(90deg, transparent, rgba(126, 184, 255, 0.26), rgba(52, 211, 153, 0.18), transparent);
+          opacity: 0.75;
+          flex-shrink: 0;
+        }
+
+        .user-accent {
+          height: 1px;
+          margin: 10px 18px 2px;
+          background: linear-gradient(90deg, transparent, rgba(52, 211, 153, 0.18), rgba(126, 184, 255, 0.26), transparent);
+          opacity: 0.75;
+          flex-shrink: 0;
+        }
+
+        .brand-block {
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: ${collapsed ? '0' : '10px'};
+          padding: ${collapsed ? '0' : '0 4px'};
+          transition:
+            gap 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            padding 0.42s cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .logo-wrapper {
           position: relative;
+          width: 40px;
+          height: 40px;
+          flex-shrink: 0;
           display: flex;
           align-items: center;
-          justify-content: flex-start;
-          width: 40px; 
-          height: 40px;
-          flex-shrink: 0; /* Para hindi siya mapipit */
-          
-          /* Kung collapsed, siguraduhin nasa gitna talaga */
-          margin-left: 6px;
-          margin: ${collapsed ? '0 auto' : '0 0 0 6px'};
-          
+          justify-content: center;
           border-radius: 50%;
           overflow: hidden;
-          box-shadow: 0 0 10px rgba(180, 210, 255, 0.2);
-        
+          box-shadow: 0 0 16px rgba(126, 184, 255, 0.2);
+        }
+
+        .logo-wrapper::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(250deg, transparent 0%, rgba(255, 255, 255, 0.38) 48%, transparent 70%);
+          background-size: 240% 100%;
+          background-position: 150% 0;
+          animation: logoShimmer 4s linear infinite;
+          pointer-events: none;
+        }
+
+        @keyframes logoShimmer {
+          0% { background-position: 150% 0; }
+          50%, 100% { background-position: -150% 0; }
         }
 
         .neu-logo {
           width: 100%;
           height: 100%;
           object-fit: contain;
+          z-index: 1;
         }
 
-        /* ── Logo Text Adjustment ── */
         .logo-text {
-          display: block; /* Huwag i-none para ma-animate ang opacity */
+          min-width: 0;
           opacity: ${collapsed ? 0 : 1};
           max-width: ${collapsed ? '0' : '150px'};
-          transform: translateX(${collapsed ? '-10px' : '0'});
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          white-space: nowrap;
+          transform: translateX(${collapsed ? '-8px' : '0'});
           pointer-events: ${collapsed ? 'none' : 'auto'};
-          padding-left: ${collapsed ? '0' : '12px'};
-        }
-
-        .logo-wrapper {
-          /* ... existing ... */
-          margin: ${collapsed ? '0 auto' : '0'};
-          transition: margin 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+          overflow: hidden;
+          transition:
+            opacity 0.24s ease,
+            max-width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .logo-title {
-          font-size: 15px;
-          font-weight: 800;
-          color: white;
-          letter-spacing: 0.05em;
-          line-height: 1;
           margin: 0;
+          color: rgba(248, 252, 255, 0.96);
+          font-size: 15px;
+          font-weight: 850;
+          line-height: 1;
+          letter-spacing: 0.04em;
+          white-space: nowrap;
         }
 
         .logo-subtitle {
-          font-size: 9px;
-          color: rgba(100, 160, 255, 0.5);
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          margin-top: 3px;
-          font-weight: 500;
-        }
-
-        /* Search */
-        .sidebar-search { padding: 10px 10px; }
-
-        .search-bar {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: ${collapsed ? '0' : '7px'};
-          background: rgba(100, 160, 255, 0.04);
-          border: 1px solid rgba(100, 160, 255, 0.08);
-          border-radius: 10px;
-          padding: 7px ${collapsed ? '0' : '12px'};
-          transition: all 0.32s ease;
-          overflow: hidden;
-        }
-
-        .search-bar:focus-within {
-          border-color: rgba(100, 160, 255, 0.2);
-          background: rgba(100, 160, 255, 0.07);
-        }
-
-        .search-icon { color: rgba(180, 210, 255, 0.28); flex-shrink: 0; }
-
-        .search-input {
-          background: none;
-          border: none;
-          outline: none;
-          font-size: 12px;
-          color: rgba(180, 210, 255, 0.7);
-          width: ${collapsed ? '0' : '100%'};
-          opacity: ${collapsed ? '0' : '1'};
-          transition: all 0.25s ease;
-        }
-
-        .search-input::placeholder { color: rgba(180, 210, 255, 0.2); }
-
-        /* Nav body */
-        .sidebar-body {
-          flex: 1;
-          overflow-y: auto;
-          overflow-x: hidden;
-          padding: 0px 0;
-        }
-
-        .sidebar-body::-webkit-scrollbar { width: 0; }
-        .sidebar-section { margin-bottom: 2px; }
-
-        .section-label {
+          margin: 4px 0 0;
+          color: rgba(126, 184, 255, 0.56);
           font-size: 9px;
           font-weight: 700;
-          color: rgba(180, 210, 255, 0.18);
-          letter-spacing: 0.14em;
+          line-height: 1;
+          letter-spacing: 0.11em;
           text-transform: uppercase;
-          padding: ${collapsed ? '0' : '10px 20px 4px'};
           white-space: nowrap;
-          overflow: hidden;
-          opacity: ${collapsed ? '0' : '1'};
-          max-height: ${collapsed ? '0' : '30px'};
-          transition: opacity 0.2s ease, max-height 0.3s ease, padding 0.3s ease;
         }
 
-        .section-divider {
-          height: 1px;
-          background: rgba(100, 160, 255, 0.06);
-          margin: ${collapsed ? '6px 14px' : '0'};
-          opacity: ${collapsed ? '1' : '0'};
-          transition: opacity 0.25s ease;
+        .sidebar-body {
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 12px;
+          padding: 0 0 10px;
+          overflow: visible;
+        }
+
+        .sidebar-section {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+        }
+
+        .section-label {
+          height: ${collapsed ? '0' : '24px'};
+          opacity: ${collapsed ? 0 : 1};
+          overflow: hidden;
+          padding: ${collapsed ? '0' : '0 12px'};
+          color: rgba(180, 210, 255, 0.26);
+          font-size: 9px;
+          font-weight: 850;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          display: flex;
+          align-items: center;
+          transition: all 0.24s ease;
         }
 
         .section-items {
-          padding: 0 8px;
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 5px;
+          padding: 0 ${collapsed ? '8px' : '8px'};
+          transition: padding 0.42s cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .nav-item {
+          position: relative;
+          min-height: 38px;
           display: flex;
           align-items: center;
           justify-content: ${collapsed ? 'center' : 'flex-start'};
-          gap: ${collapsed ? '0' : '9px'};
-          padding: 9px ${collapsed ? '0' : '12px'};
-          border-radius: 10px;
-          text-decoration: none;
-          color: rgba(180, 210, 255, 0.4);
-          font-size: 12.5px;
-          font-weight: 500;
-          transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+          gap: ${collapsed ? '0' : '10px'};
+          padding: ${collapsed ? '0' : '0 12px'};
+          border-radius: 12px;
           border: 1px solid transparent;
-          position: relative;
-          overflow: hidden;
+          color: rgba(180, 210, 255, 0.42);
+          text-decoration: none;
+          font-size: 12.5px;
+          font-weight: 650;
+          transform: translateX(${collapsed ? '0' : '0'});
+          transition:
+            background 0.22s ease,
+            border-color 0.22s ease,
+            color 0.22s ease,
+            transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+            padding 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            gap 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            min-height 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+          overflow: visible;
         }
 
         .nav-item:hover {
-          background: rgba(100, 160, 255, 0.07);
-          color: rgba(180, 210, 255, 0.8);
+          background: rgba(100, 160, 255, 0.08);
+          color: rgba(220, 236, 255, 0.9);
         }
 
         .nav-item.active {
-          background: rgba(46, 134, 245, 0.12);
-          border-color: rgba(100, 160, 255, 0.14);
-          color: #7eb8ff;
-        }
-
-        .nav-item.active::before {
-          content: '';
-          position: absolute;
-          left: 0;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 3px;
-          height: 18px;
-          background: linear-gradient(180deg, #1a4fd6, #2e86f5);
-          border-radius: 0 3px 3px 0;
+          background: linear-gradient(90deg, rgba(46, 134, 245, 0.22), rgba(34, 211, 238, 0.1));
+          border-color: rgba(100, 160, 255, 0.2);
+          color: rgba(226, 244, 255, 0.96);
+          box-shadow: inset 3px 0 0 rgba(46, 134, 245, 0.95);
         }
 
         .nav-icon {
-          width: 15px;
-          height: 15px;
+          width: 16px;
+          height: 16px;
           flex-shrink: 0;
-          opacity: 0.6;
-          transition: opacity 0.2s;
+          opacity: 0.72;
         }
 
-        .nav-item:hover .nav-icon,
-        .nav-item.active .nav-icon { opacity: 1; }
+        .nav-item.active .nav-icon,
+        .nav-item:hover .nav-icon {
+          opacity: 1;
+          color: #38bdf8;
+        }
 
         .nav-label {
+          min-width: 0;
           white-space: nowrap;
           overflow: hidden;
-          opacity: ${collapsed ? '0' : '1'};
-          max-width: ${collapsed ? '0' : '200px'};
-          transition: opacity 0.2s ease, max-width 0.32s ease;
+          opacity: ${collapsed ? 0 : 1};
+          max-width: ${collapsed ? '0' : '160px'};
+          transform: translateX(${collapsed ? '-8px' : '0'});
+          transition:
+            opacity 0.24s ease,
+            max-width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .nav-tooltip {
           display: none;
           position: absolute;
-          left: 58px;
+          left: 54px;
           top: 50%;
           transform: translateY(-50%);
-          background: rgba(6, 14, 34, 0.97);
-          border: 1px solid rgba(100, 160, 255, 0.15);
-          color: rgba(180, 210, 255, 0.85);
-          font-size: 11px;
-          padding: 5px 10px;
-          border-radius: 7px;
+          min-height: 30px;
+          align-items: center;
+          padding: 0 12px;
+          border-radius: 9px;
+          border: 1px solid rgba(126, 184, 255, 0.16);
+          background: rgba(10, 22, 45, 0.96);
+          color: rgba(235, 245, 255, 0.92);
+          font-size: 11.5px;
+          font-weight: 750;
           white-space: nowrap;
           pointer-events: none;
-          z-index: 200;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+          z-index: 500;
+          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.34);
+        }
+
+        .nav-tooltip::before {
+          content: '';
+          position: absolute;
+          left: -5px;
+          top: 50%;
+          width: 10px;
+          height: 10px;
+          transform: translateY(-50%) rotate(45deg);
+          background: rgba(10, 22, 45, 0.96);
+          border-left: 1px solid rgba(126, 184, 255, 0.16);
+          border-bottom: 1px solid rgba(126, 184, 255, 0.16);
         }
 
         .nav-item:hover .nav-tooltip {
-          display: ${collapsed ? 'block' : 'none'};
+          display: ${collapsed ? 'flex' : 'none'};
         }
 
-        /* ── User section ── */
         .sidebar-user {
-          padding: 12px ${collapsed ? '0' : '12px'};
-          border-top: 1px solid rgba(100, 160, 255, 0.06);
+          min-height: 68px;
           display: flex;
           align-items: center;
           justify-content: ${collapsed ? 'center' : 'flex-start'};
           gap: ${collapsed ? '0' : '10px'};
-          transition: all 0.32s ease;
-          overflow: hidden;
+          padding: ${collapsed ? '12px 8px' : '12px'};
+          box-sizing: border-box;
+          transition:
+            padding 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            gap 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            justify-content 0.42s cubic-bezier(0.22, 1, 0.36, 1);
         }
 
         .user-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #1a4fd6, #2e86f5);
+          width: 34px;
+          height: 34px;
+          flex-shrink: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 12px;
-          font-weight: 700;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #2563eb, #38bdf8);
           color: white;
-          /* Same size as nav icons area — keeps visual alignment */
-          flex-shrink: 0;
-          box-shadow: 0 2px 10px rgba(30,80,220,0.3);
+          font-size: 12px;
+          font-weight: 850;
+          box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
         }
 
         .user-info {
           flex: 1;
           min-width: 0;
+          opacity: ${collapsed ? 0 : 1};
+          max-width: ${collapsed ? '0' : '150px'};
           overflow: hidden;
-          opacity: ${collapsed ? '0' : '1'};
-          max-width: ${collapsed ? '0' : '200px'};
-          transition: opacity 0.2s ease, max-width 0.32s ease;
+          transform: translateX(${collapsed ? '-8px' : '0'});
+          transition:
+            opacity 0.24s ease,
+            max-width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .user-name,
+        .user-email,
+        .user-role {
+          display: block;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .user-name {
+          color: rgba(245, 250, 255, 0.9);
+          font-size: 11.5px;
+          font-weight: 750;
         }
 
         .user-email {
-          font-size: 11.5px;
-          color: rgba(180, 210, 255, 0.5);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          display: block;
+          margin-top: 2px;
+          color: rgba(180, 210, 255, 0.45);
+          font-size: 10.5px;
         }
 
         .user-role {
-          font-size: 9px;
-          color: rgba(180, 210, 255, 0.2);
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
           margin-top: 2px;
-          display: block;
+          color: rgba(180, 210, 255, 0.26);
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
 
         .logout-btn {
-          /* Dito yung magic: Ginagawa nating 0 ang width kapag collapsed */
-          width: ${collapsed ? '0' : '28px'};
-          height: 28px;
-          border-radius: 8px;
-          background: transparent;
-          border: 1px solid transparent;
-          display: flex;
+          width: ${collapsed ? '0' : '30px'};
+          height: 30px;
+          flex-shrink: 0;
+          display: inline-flex;
           align-items: center;
           justify-content: center;
+          border-radius: 10px;
+          border: 1px solid transparent;
+          background: transparent;
+          color: rgba(180, 210, 255, 0.3);
           cursor: pointer;
-          color: rgba(180, 210, 255, 0.22);
-          flex-shrink: 0;
-          overflow: hidden; /* Tinatago yung icon mismo kapag lumiit na sa 0 */
-          opacity: ${collapsed ? '0' : '1'};
+          opacity: ${collapsed ? 0 : 1};
           pointer-events: ${collapsed ? 'none' : 'auto'};
-          /* Pinalitan ng 0.32s para sabay sa animation ng sidebar */
-          transition: all 0.32s ease; 
+          overflow: hidden;
+          transition:
+            width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 0.24s ease,
+            border-color 0.22s ease,
+            background 0.22s ease,
+            color 0.22s ease;
         }
 
         .logout-btn:hover {
-          background: rgba(255,70,70,0.08);
-          border-color: rgba(255,70,70,0.15);
-          color: rgba(255,100,100,0.75);
+          background: rgba(239, 68, 68, 0.1);
+          border-color: rgba(239, 68, 68, 0.18);
+          color: rgba(252, 165, 165, 0.95);
         }
-        /* ── Logo Shimmer Animation Fix (Circle Version) ── */
-        
-        /* ── Updated Logo Wrapper (40px) ── */
-        .logo-wrapper {
-          position: relative;
+
+        .logout-btn:disabled {
+          cursor: wait;
+          opacity: 0.5;
+        }
+
+        .logout-confirm-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 300;
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 40px; /* Sakto sa 40px */
-          height: 40px;
-          flex-shrink: 0;
-          overflow: hidden; 
-          border-radius: 50%; 
-          background: transparent; 
-          border: none;
-          /* Manatili ang subtle glow */
-          box-shadow: 0 0 10px rgba(180, 210, 255, 0.2);
-          transition: all 0.3s ease;
+          padding: 18px;
+          background: rgba(1, 6, 18, 0.72);
+          backdrop-filter: blur(7px);
         }
 
-        .neu-logo {
-          /* Gawin nating 100% para sagad ang shimmer sa 40px */
-          width: 100%; 
-          height: 100%;
-          object-fit: contain;
-          z-index: 2;
+        .logout-confirm-dialog {
+          width: min(360px, 100%);
+          border-radius: 16px;
+          border: 1px solid rgba(100, 160, 255, 0.16);
+          background: rgba(8, 18, 40, 0.94);
+          box-shadow: 0 22px 48px rgba(0, 0, 0, 0.42);
+          padding: 18px;
         }
 
-        /* ── Sidebar Header Adjustment ── */
-        .sidebar-header {
-          padding: 14px ${collapsed ? '8px' : '16px'};
-          min-height: 64px;
-          width: 100%;
+        .logout-confirm-icon {
+          width: 38px;
+          height: 38px;
           display: flex;
           align-items: center;
-          justify-content: ${collapsed ? 'center' : 'flex-start'};
-          gap: 1px;
-          transition: all 0.32s cubic-bezier(0.4, 0, 0.2, 1);
-          overflow: hidden;
-          box-sizing: border-box;
+          justify-content: center;
+          border-radius: 12px;
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.18);
+          color: rgba(248, 113, 113, 0.95);
+          margin-bottom: 14px;
         }
 
-        .logo-wrapper {
-          margin: 0 !important;
-          flex-shrink: 0;
+        .logout-confirm-title {
+          margin: 0;
+          color: rgba(245, 250, 255, 0.96);
+          font-size: 16px;
+          font-weight: 800;
         }
 
-        /* Panatilihin ang slow-mo shimmer (4s cycle) */
-        .logo-wrapper::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          z-index: 3;
-          background: linear-gradient(
-            250deg, 
-            transparent 0%, 
-            rgba(255, 255, 255, 0) 30%, 
-            rgba(255, 255, 255, 0.4) 50%, 
-            rgba(255, 255, 255, 0) 70%, 
-            transparent 100%
-          );
-          background-size: 250% 100%;
-          background-repeat: no-repeat;
-          background-position: 150% 0;
-          animation: logoShimmer 4s linear infinite; 
+        .logout-confirm-text {
+          margin: 8px 0 0;
+          color: rgba(180, 210, 255, 0.52);
+          font-size: 12.5px;
+          line-height: 1.5;
         }
 
-        @keyframes logoShimmer {
-          0% { background-position: 150% 0; }
-          50% { background-position: -150% 0; }
-          100% { background-position: -150% 0; }
+        .logout-confirm-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+          margin-top: 18px;
+        }
+
+        .logout-confirm-btn {
+          min-height: 34px;
+          border-radius: 10px;
+          border: 1px solid rgba(100, 160, 255, 0.12);
+          padding: 0 13px;
+          font-size: 12px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .logout-confirm-btn.cancel {
+          background: rgba(100, 160, 255, 0.06);
+          color: rgba(190, 215, 255, 0.82);
+        }
+
+        .logout-confirm-btn.confirm {
+          background: rgba(239, 68, 68, 0.13);
+          border-color: rgba(239, 68, 68, 0.22);
+          color: rgba(252, 165, 165, 0.95);
+        }
+
+        .logout-confirm-btn:hover {
+          transform: translateY(-1px);
+        }
+
+        .logout-confirm-btn:disabled {
+          cursor: wait;
+          opacity: 0.55;
+          transform: none;
         }
       `}</style>
 
       <aside className="sidebar">
-
-        {/* Toggle — center right edge */}
-        <button className="toggle-btn" onClick={() => setCollapsed(!collapsed)}>
+        <button
+          className="sidebar-toggle"
+          type="button"
+          onClick={() => setCollapsed((value) => !value)}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
           {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
 
-        {/* Header */}
         <div className="sidebar-header">
-          <div className="logo-wrapper">
-            <img src={neuLogo} alt="NEU" className="neu-logo" />
-          </div>
-
-          <div className="logo-text">
-            <p className="logo-title">HOPE CMS</p>
-            <p className="logo-subtitle">Customer Management</p>
-          </div>
-        </div>
-
-        {/* Search */}
-        <div className="sidebar-search">
-          <div className="search-bar">
-            <Search size={13} className="search-icon" />
-            <input className="search-input" placeholder="Search..." />
+          <div className="brand-block">
+            <div className="logo-wrapper">
+              <img src={neuLogo} alt="NEU" className="neu-logo" />
+            </div>
+            <div className="logo-text">
+              <p className="logo-title">HOPE CMS</p>
+              <p className="logo-subtitle">Customer Management</p>
+            </div>
           </div>
         </div>
 
-        {/* Nav */}
-        <div className="sidebar-body">
-          {sections.map((section, i) => (
+        <div className="header-accent" />
+
+        <nav className="sidebar-body" aria-label="Primary navigation">
+          {sections.map((section) => (
             <div className="sidebar-section" key={section.label}>
-              {i > 0 && <div className="section-divider" />}
               <div className="section-label">{section.label}</div>
               <div className="section-items">
                 {section.items.map((item) => (
@@ -561,21 +650,42 @@ function Sidebar() {
               </div>
             </div>
           ))}
-        </div>
+        </nav>
 
-        {/* User */}
+        <div className="user-accent" />
+
         <div className="sidebar-user">
           <div className="user-avatar">{user.initials}</div>
           <div className="user-info">
+            <span className="user-name">{user.name}</span>
             <span className="user-email">{user.email}</span>
             <span className="user-role">{user.role}</span>
           </div>
-          <button className="logout-btn" title="Sign out">
-            <LogOut size={13} />
+          <button className="logout-btn" type="button" title="Sign out" onClick={() => setShowLogoutConfirm(true)} disabled={isSigningOut}>
+            <LogOut size={14} />
           </button>
         </div>
-
       </aside>
+
+      {showLogoutConfirm && (
+        <div className="logout-confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="logout-confirm-title">
+          <div className="logout-confirm-dialog">
+            <div className="logout-confirm-icon">
+              <LogOut size={18} />
+            </div>
+            <h2 className="logout-confirm-title" id="logout-confirm-title">Sign out?</h2>
+            <p className="logout-confirm-text">Are you sure you want to log out of Hope CMS?</p>
+            <div className="logout-confirm-actions">
+              <button className="logout-confirm-btn cancel" type="button" onClick={() => setShowLogoutConfirm(false)} disabled={isSigningOut}>
+                Cancel
+              </button>
+              <button className="logout-confirm-btn confirm" type="button" onClick={handleSignOut} disabled={isSigningOut}>
+                {isSigningOut ? 'Signing out...' : 'Yes, log out'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

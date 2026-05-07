@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react'
 import { X, Save } from 'lucide-react'
 
-// para kay M1: i-replace yung onSubmit handler ng actual na updateCustomer() API call
-function EditCustomerModal({ isOpen, onClose, customer }) {
+function EditCustomerModal({ isOpen, onClose, customer, onSubmit }) {
   const [form, setForm] = useState({
     custno: '',
     custname: '',
     address: '',
     payterm: 'COD',
   })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
-  // Pre-fill form kapag may customer na ipinasa
   useEffect(() => {
     if (customer) {
       setForm({
@@ -19,6 +19,7 @@ function EditCustomerModal({ isOpen, onClose, customer }) {
         address: customer.address || '',
         payterm: customer.payterm || 'COD',
       })
+      setError('')
     }
   }, [customer])
 
@@ -28,10 +29,21 @@ function EditCustomerModal({ isOpen, onClose, customer }) {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  const handleSubmit = () => {
-    // para kay M1: ilagay dito yung updateCustomer(form) API call
-    console.log('Edit Customer:', form)
-    onClose()
+  const handleSubmit = async () => {
+    try {
+      setSaving(true)
+      setError('')
+      await onSubmit?.(form.custno, {
+        custname: form.custname.trim(),
+        address: form.address.trim(),
+        payterm: form.payterm,
+      })
+      onClose()
+    } catch (err) {
+      setError(err.message || 'Unable to update customer.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -223,6 +235,9 @@ function EditCustomerModal({ isOpen, onClose, customer }) {
         }
 
         .btn-submit:active { transform: translateY(0); }
+        .btn-submit:disabled,
+        .btn-cancel:disabled { opacity: 0.55; cursor: wait; transform: none; }
+        .modal-error { color: #fca5a5; font-size: 12px; line-height: 1.45; margin: 0; }
       `}</style>
 
       <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -289,14 +304,16 @@ function EditCustomerModal({ isOpen, onClose, customer }) {
               </select>
             </div>
 
+            {error && <p className="modal-error">{error}</p>}
+
           </div>
 
           {/* Footer */}
           <div className="modal-footer">
-            <button className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button className="btn-submit" onClick={handleSubmit}>
+            <button className="btn-cancel" onClick={onClose} disabled={saving}>Cancel</button>
+            <button className="btn-submit" onClick={handleSubmit} disabled={saving}>
               <Save size={13} />
-              Save Changes
+              {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
 

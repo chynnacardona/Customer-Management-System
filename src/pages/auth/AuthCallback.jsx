@@ -32,13 +32,20 @@ const AuthCallback = () => {
   }, [navigate]);
 
   return (
-    <div style={styles.container}>
-      <ParticlesBg />
-      <div style={styles.loaderBox}>
-        <div style={styles.spinner}></div>
-        <p style={styles.text}>Verifying account...</p>
+    <>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div style={styles.container}>
+        <ParticlesBg />
+        <div style={styles.loaderBox}>
+          <div style={styles.spinner}></div>
+          <p style={styles.text}>Verifying account...</p>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

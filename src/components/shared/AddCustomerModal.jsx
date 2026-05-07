@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { X, Plus } from 'lucide-react'
 
-// para kay M1: i-replace yung onSubmit handler ng actual na addCustomer() API call
-function AddCustomerModal({ isOpen, onClose }) {
+function AddCustomerModal({ isOpen, onClose, onSubmit }) {
   const [form, setForm] = useState({
     custno: '',
     custname: '',
     address: '',
     payterm: 'COD',
   })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   if (!isOpen) return null
 
@@ -16,10 +17,23 @@ function AddCustomerModal({ isOpen, onClose }) {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  const handleSubmit = () => {
-    // para kay M1: ilagay dito yung addCustomer(form) API call
-    console.log('Add Customer:', form)
-    onClose()
+  const handleSubmit = async () => {
+    try {
+      setSaving(true)
+      setError('')
+      await onSubmit?.({
+        custno: form.custno.trim(),
+        custname: form.custname.trim(),
+        address: form.address.trim(),
+        payterm: form.payterm,
+      })
+      setForm({ custno: '', custname: '', address: '', payterm: 'COD' })
+      onClose()
+    } catch (err) {
+      setError(err.message || 'Unable to add customer.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -205,6 +219,9 @@ function AddCustomerModal({ isOpen, onClose }) {
         }
 
         .btn-submit:active { transform: translateY(0); }
+        .btn-submit:disabled,
+        .btn-cancel:disabled { opacity: 0.55; cursor: wait; transform: none; }
+        .modal-error { color: #fca5a5; font-size: 12px; line-height: 1.45; margin: 0; }
       `}</style>
 
       <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -268,14 +285,16 @@ function AddCustomerModal({ isOpen, onClose }) {
               </select>
             </div>
 
+            {error && <p className="modal-error">{error}</p>}
+
           </div>
 
           {/* Footer */}
           <div className="modal-footer">
-            <button className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button className="btn-submit" onClick={handleSubmit}>
+            <button className="btn-cancel" onClick={onClose} disabled={saving}>Cancel</button>
+            <button className="btn-submit" onClick={handleSubmit} disabled={saving}>
               <Plus size={13} />
-              Add Customer
+              {saving ? 'Adding...' : 'Add Customer'}
             </button>
           </div>
 

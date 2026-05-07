@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from "../../supabase/supabaseClient";
 
 function Login() {
@@ -53,16 +54,15 @@ function Login() {
     draw()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    console.log("Auth Event:", event);
-    
-    // Pag nakita ng app yung 'SIGNED_IN' na galing Google, diretso na dapat siya sa dashboard.
-    if (event === 'SIGNED_IN' && session) {
-      navigate('/dashboard');
-    }
-  });
+      if (event === 'SIGNED_IN' && session) {
+        navigate('/dashboard');
+      }
+    });
 
   return () => {
-    subscription.unsubscribe(); // Importante ito para walang memory leak
+    cancelAnimationFrame(animationId)
+    window.removeEventListener('resize', handleResize)
+    subscription.unsubscribe()
   };
 }, [navigate]);
 
@@ -82,6 +82,10 @@ function Login() {
         .select('email')
         .eq('email', email.trim().toLowerCase())
         .maybeSingle()
+
+      if (dbError) {
+        console.warn('Unable to check user profile before login:', dbError.message)
+      }
 
       // 2. Subukan ang manual login via Auth
       const { data, error: authError } = await supabase.auth.signInWithPassword({
@@ -341,13 +345,13 @@ function Login() {
                 required
               />
               <button type="button" className="toggle-btn mb-1.5" onClick={() => setShowPassword(!showPassword)}>
-                {showPassword ? "👁️" : "👁️‍🗨️"}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
 
           <div className="flex justify-end mb-5">
-            <a href="/forgot-password" style={{ color: '#7eb8ff' }} className="text-xs">Forgot password?</a>
+            <Link to="/forgot-password" style={{ color: '#7eb8ff' }} className="text-xs">Forgot password?</Link>
           </div>
 
           {/* ETO YUNG MESSAGE SA BABA - Dynamic na dapat ito */}
@@ -372,9 +376,9 @@ function Login() {
           <div className="text-center pt-4 mt-2 border-t border-white/5">
             <p className="text-xs" style={{ color: 'rgba(180, 210, 255, 0.45)' }}>
               No account yet?{' '}
-              <a href="/register" className="font-medium hover:underline" style={{ color: '#7eb8ff' }}>
+              <Link to="/register" className="font-medium hover:underline" style={{ color: '#7eb8ff' }}>
                 Register here
-              </a>
+              </Link>
             </p>
           </div>
         </form>

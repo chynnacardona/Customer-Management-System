@@ -8,8 +8,7 @@ const AppShell = () => {
     <div style={shellStyles.container}>
       <ParticlesBg />
       <Sidebar />
-      <main style={shellStyles.mainContent}>
-        {/* This is where your nested pages will appear */}
+      <main className="dashboard-scroll-pane" style={shellStyles.mainContent}>
         <Outlet /> 
       </main>
     </div>
@@ -19,7 +18,7 @@ const AppShell = () => {
 const shellStyles = {
   container: {
     display: 'flex',
-    minHeight: '100vh',
+    height: '100vh',
     width: '100vw',
     background: 'linear-gradient(160deg, #020818 0%, #051030 50%, #060d28 100%)',
     position: 'relative',
@@ -27,9 +26,13 @@ const shellStyles = {
   },
   mainContent: {
     flex: 1,
+    minWidth: 0,
+    height: '100vh',
+    boxSizing: 'border-box',
     position: 'relative',
     zIndex: 1,
     padding: '24px',
+    overflowX: 'hidden',
     overflowY: 'auto',
   }
 };

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { CheckCircle2, Clock3, Eye, EyeOff } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from "../../supabase/supabaseClient";
 
 function Register() {
@@ -9,6 +10,7 @@ function Register() {
   // --- States for Form Data ---
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -81,62 +83,55 @@ function Register() {
   }
 
   try {
-    // Check sa public 'user' table niyo
-    const { data: existingUser } = await supabase
-      .from('user')
-      .select('email')
-      .eq('email', email.trim())
-      .maybeSingle()
-
-    if (existingUser) {
-      setErrorField('email') // I-rered ang email field
-      setErrorMsg("This email is already registered. Try logging in with Google.")
-      setLoading(false)
-      return
-    }
-
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email: email.trim(),
+      email: email.trim().toLowerCase(),
       password: password,
       options: {
         data: {
           first_name: firstName,
           last_name: lastName,
+          full_name: `${firstName} ${lastName}`,
+          username,
         }
       }
     })
 
     if (signUpError) throw signUpError
 
+    if (data.user?.identities?.length === 0) {
+      setErrorField('email')
+      setErrorMsg("This email is already registered. Try signing in instead.")
+      return
+    }
+
     if (data.user) {
-    // Insert sa public table niyo
-    await supabase.from('user').insert([
-        { 
-            email: email.trim(), 
-            full_name: `${firstName} ${lastName}`, 
-            role: 'USER', 
-            status: 'ACTIVE' 
-        }
-    ]);
+      setIsSuccess(true);
+      setLoading(false);
 
-    // 1. I-set ang success state sa true
-    setIsSuccess(true);
-    setLoading(false);
-
-    // 2. Mag-wait ng 3 seconds bago lumipat sa login page
-    setTimeout(() => {
+      setTimeout(() => {
         navigate('/login');
-    }, 3000);
-}
+      }, 3000);
+    }
   } catch (error) {
-    setErrorMsg(error.message)
-    // Dito natin huhulihin yung ibang errors para mag-red ang fields
-    if (error.message.toLowerCase().includes("email")) setErrorField('email')
-    if (error.message.toLowerCase().includes("password")) setErrorField('password')
+    const message = error.message || 'Registration failed. Please try again.'
+    if (message.toLowerCase().includes('database error')) {
+      setErrorMsg('Your auth account was removed, but the old profile row may still exist in the database. Ask the DB owner to rerun the provision user trigger migration, then try again.')
+    } else {
+      setErrorMsg(message)
+    }
+    if (message.toLowerCase().includes("email")) setErrorField('email')
+    if (message.toLowerCase().includes("password")) setErrorField('password')
   } finally {
     setLoading(false)
   }
 }
+
+  const handleGoogleRegister = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + '/auth/callback' },
+    })
+  }
 
   return (
     <>
@@ -263,6 +258,27 @@ function Register() {
         .create-btn:active { 
         transform: translateY(0px); 
         }
+        .google-btn {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          padding: 11px;
+          border-radius: 12px;
+          border: 1px solid rgba(100, 160, 255, 0.1);
+          background: rgba(255,255,255,0.03);
+          color: rgba(180, 210, 255, 0.7);
+          font-size: 14px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .google-btn:hover {
+          background: rgba(100, 160, 255, 0.07);
+          border-color: rgba(100, 160, 255, 0.22);
+          color: rgba(220, 235, 255, 0.9);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(30, 80, 220, 0.2);
+        }
         .error-glow {
           border-color: rgba(255, 100, 100, 0.5) !important;
           background: rgba(255, 50, 50, 0.05) !important;
@@ -280,32 +296,72 @@ function Register() {
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
+        @keyframes successCardIn {
+          from { opacity: 0; transform: translateY(18px) scale(0.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
         .success-notification {
           position: fixed;
-          top: 20px;
-          right: 20px;
-          background: rgba(10, 25, 50, 0.9);
-          backdrop-filter: blur(15px);
-          border: 1px solid rgba(0, 255, 150, 0.3);
-          padding: 16px 24px;
-          border-radius: 16px;
+          inset: 0;
           z-index: 1000;
           display: flex;
           align-items: center;
-          gap: 12px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-          animation: slideInRight 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+          justify-content: center;
+          padding: 18px;
+          background: rgba(1, 6, 18, 0.68);
+          backdrop-filter: blur(8px);
+        }
+        .success-card {
+          width: min(420px, 100%);
+          padding: 24px;
+          border-radius: 22px;
+          border: 1px solid rgba(126, 184, 255, 0.16);
+          background: rgba(8, 18, 40, 0.96);
+          box-shadow: 0 24px 60px rgba(0,0,0,0.58), inset 0 1px 0 rgba(255,255,255,0.06);
+          text-align: center;
+          animation: successCardIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
         .success-icon {
-          background: #00ff96;
-          color: #051030;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
+          width: 56px;
+          height: 56px;
+          margin: 0 auto 16px;
+          border-radius: 18px;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-weight: bold;
+          background: rgba(34, 197, 94, 0.12);
+          border: 1px solid rgba(134, 239, 172, 0.24);
+          color: #86efac;
+          box-shadow: 0 10px 28px rgba(34, 197, 94, 0.12);
+        }
+        .success-title {
+          margin: 0;
+          color: rgba(245, 250, 255, 0.96);
+          font-size: 18px;
+          font-weight: 800;
+        }
+        .success-copy {
+          margin: 9px 0 0;
+          color: rgba(190, 215, 255, 0.62);
+          font-size: 13px;
+          line-height: 1.55;
+        }
+        .pending-pill {
+          margin: 18px auto 0;
+          width: fit-content;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 34px;
+          padding: 0 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(147, 197, 253, 0.18);
+          background: rgba(59, 130, 246, 0.1);
+          color: rgba(191, 219, 254, 0.9);
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
         }
       `}</style>
 
@@ -354,6 +410,19 @@ function Register() {
             </div>
           </div>
 
+          <div className="input-wrap mb-3">
+            <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+              style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Username</label>
+            <input
+              type="text"
+              placeholder="Choose a username"
+              className={`glow-input ${errorField === 'username' ? 'error-glow' : ''}`}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+            />
+          </div>
+
           {/* Email */}
           <div className="input-wrap mb-3">
             <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
@@ -387,7 +456,7 @@ function Register() {
                 className="toggle-btn mb-1.5" // Sinunod natin yung class mo sa login
                 onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword ? "👁️" : "👁️‍🗨️"}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
@@ -410,7 +479,7 @@ function Register() {
                 className="toggle-btn mb-1.5" 
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               >
-                {showConfirmPassword ? "👁️" : "👁️‍🗨️"}
+                {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
@@ -428,10 +497,15 @@ function Register() {
             {loading ? 'Creating Account...' : 'Create Account'}
           </button>
 
+          <button type="button" onClick={handleGoogleRegister} className="google-btn mt-3">
+            <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-4 h-4" />
+            Register with Google
+          </button>
+
           <p className="text-center text-xs mt-5" style={{ color: 'rgba(180,210,255,0.25)' }}>
             Already have an account?{" "}
-            <a href="/login" className="font-medium transition-all hover:opacity-80"
-              style={{ color: '#7eb8ff' }}>Sign In</a>
+            <Link to="/login" className="font-medium transition-all hover:opacity-80"
+              style={{ color: '#7eb8ff' }}>Sign In</Link>
           </p>
 
         </form>
@@ -439,16 +513,18 @@ function Register() {
         {/* Success Notification */}
         {isSuccess && (
           <div className="success-notification">
-            <div className="success-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <div>
-              <h4 className="text-white text-sm font-semibold">Registration Successful!</h4>
-              <p style={{ color: 'rgba(180, 210, 255, 0.6)', fontSize: '11px' }}>
-                Redirecting you to login page...
+            <div className="success-card">
+              <div className="success-icon">
+                <CheckCircle2 size={30} />
+              </div>
+              <h4 className="success-title">Registration successful</h4>
+              <p className="success-copy">
+                Your account was created and is now waiting for Sales Manager activation. You will be redirected to sign in shortly.
               </p>
+              <div className="pending-pill">
+                <Clock3 size={14} />
+                Pending activation
+              </div>
             </div>
           </div>
         )}

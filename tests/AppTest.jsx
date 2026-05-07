@@ -1,4 +1,3 @@
-import { supabase } from "./supabase/supabaseClient";
 import { AuthProvider } from "./context/AuthContext";
 import { Routes, Route } from 'react-router-dom';
 import Login from './pages/auth/Login';
@@ -24,7 +23,7 @@ function App() {
         payterm: 'COD',             
         record_status: 'active' 
         });
-        const custId = newCust[0].custno;
+        console.log("Created customer:", newCust[0].custno);
         console.log("✅ Create Success");
 
         // 3. TEST UPDATE

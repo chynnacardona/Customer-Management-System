@@ -1,27 +1,21 @@
 import { useState } from 'react'
-import { CalendarDays, ChevronRight, ReceiptText, Loader2 } from 'lucide-react'
+import { ReceiptText } from 'lucide-react'
 import SalesDetailModal from './SalesDetailModal'
-import { getSalesDetail } from '../../services/salesProductApi' // 1. Import the API
+import { getSalesDetail } from '../../services/salesProductApi'
 
 function SalesHistoryPanel({ transactions }) {
-  // 2. Added these states to hold the "Actual" info from the DB
   const [selectedTransaction, setSelectedTransaction] = useState(null)
   const [details, setDetails] = useState([]) 
   const [loadingDetail, setLoadingDetail] = useState(false)
 
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value)
-
-  // 3. Updated Logic to fetch from database when a row is clicked
   const handleOpenDetail = async (transaction) => {
-    setSelectedTransaction(transaction) // Open the modal immediately
+    setSelectedTransaction(transaction)
     setLoadingDetail(true)
-    setDetails([]) // Clear old items
+    setDetails([])
     
     try {
-      // transaction.trans_no comes from your Supabase 'sales' table
-      const data = await getSalesDetail(transaction.trans_no || transaction.transNo)
-      setDetails(data) // Now 'details' contains real product descriptions!
+      const data = await getSalesDetail(transaction.transno || transaction.trans_no || transaction.transNo)
+      setDetails(data)
     } catch (err) {
       console.error("Error fetching line items:", err.message)
     } finally {
@@ -77,7 +71,6 @@ function SalesHistoryPanel({ transactions }) {
               </thead>
               <tbody>
                  {transactions.map((ts) => {
-                    // Calculate the money total for this specific row
                     const rowTotal = ts.salesdetail?.reduce((acc, item) => {
                       const p = item.product?.pricehist?.[0]?.unitprice || 0;
                       return acc + (Number(item.quantity) * p);
@@ -100,7 +93,6 @@ function SalesHistoryPanel({ transactions }) {
         )}
       </section>
 
-      {/* 6. Pass the live 'details' and 'loading' status to the Modal */}
       <SalesDetailModal 
         isOpen={Boolean(selectedTransaction)} 
         transaction={selectedTransaction} 

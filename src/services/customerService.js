@@ -1,28 +1,25 @@
 import { supabase } from '../supabase/supabaseClient';
 
 export const customerService = {
-  // 1. READ
   getCustomers: async (userType) => {
-    let query = supabase.from('customer').select('*');
+    let query = supabase.from('customer').select('*').order('custno');
     if (userType === 'USER') {
-      query = query.eq('record_status', 'active');
+      query = query.in('record_status', ['ACTIVE', 'active']);
     }
     const { data, error } = await query;
     if (error) throw error;
     return data;
   },
 
-  // 2. CREATE 
   addCustomer: async (customerData) => {
     const { data, error } = await supabase
       .from('customer')
-      .insert([customerData]) // customerData should be an object like { name: 'John', ... }
+      .insert([{ ...customerData, record_status: 'ACTIVE' }])
       .select();
     if (error) throw error;
     return data;
   },
 
-  // 3. UPDATE 
   updateCustomer: async (custno, updates) => {
     const { data, error } = await supabase
       .from('customer')
@@ -33,24 +30,34 @@ export const customerService = {
     return data;
   },
 
-  // 4. DELETE (Soft Delete)
   softDeleteCustomer: async (custno) => {
     const { data, error } = await supabase
       .from('customer')
-      .update({ record_status: 'deleted' }) // We don't actually remove the row!
+      .update({ record_status: 'INACTIVE' })
       .eq('custno', custno)
       .select();
     if (error) throw error;
     return data;
   },
-  // 5. RECOVER: Bring a deleted customer back to 'active' status
+
   recoverCustomer: async (custno) => {
     const { data, error } = await supabase
       .from('customer')
-      .update({ record_status: 'active' })
+      .update({ record_status: 'ACTIVE' })
       .eq('custno', custno)
       .select();
     
+    if (error) throw error;
+    return data;
+  },
+
+  getDeletedCustomers: async () => {
+    const { data, error } = await supabase
+      .from('customer')
+      .select('*')
+      .in('record_status', ['INACTIVE', 'inactive', 'deleted'])
+      .order('custno');
+
     if (error) throw error;
     return data;
   }

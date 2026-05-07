@@ -1,23 +1,39 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../supabase/supabaseClient";
-
-const AuthContext = createContext({});
+import { AuthContext } from "./useAuth";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authNotice, setAuthNotice] = useState(null);
   const missingProfileWarnedRef = useRef(false);
+
+  const showAuthNotice = useCallback((notice) => {
+    setAuthNotice(notice);
+    window.setTimeout(() => setAuthNotice(null), 5200);
+  }, []);
 
   const handleLogin = async (emailInput) => {
     const { error } = await supabase.auth.signInWithOtp({
       email: emailInput,
       options: { emailRedirectTo: 'http://localhost:5173/auth/callback' },
     });
-    if (error) alert("Login Error: " + error.message);
-    else alert("Check your email for the magic link!");
+    if (error) {
+      showAuthNotice({
+        tone: 'error',
+        title: 'Login failed',
+        message: error.message,
+      });
+    } else {
+      showAuthNotice({
+        tone: 'success',
+        title: 'Magic link sent',
+        message: 'Check your email to continue signing in.',
+      });
+    }
   };
 
-  const checkAndSetUser = async (sessionUser) => {
+  const checkAndSetUser = useCallback(async (sessionUser) => {
     if (!sessionUser) {
       setUser(null);
       return;
@@ -56,7 +72,11 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setTimeout(() => {
           supabase.auth.signOut();
-          alert("Your account is pending activation by a Sales Manager.");
+          showAuthNotice({
+            tone: 'pending',
+            title: 'Account pending activation',
+            message: 'Registration successful. A Sales Manager needs to activate your account before you can sign in.',
+          });
         }, 0);
         return;
       }
@@ -66,7 +86,7 @@ export const AuthProvider = ({ children }) => {
       console.warn("Unable to load user profile. Allowing entry for setup.", err);
       setUser(sessionUser);
     }
-  };
+  }, [showAuthNotice]);
 
   useEffect(() => {
     let mounted = true;
@@ -97,7 +117,7 @@ export const AuthProvider = ({ children }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [checkAndSetUser]);
 
   return (
     <AuthContext.Provider value={{ user, loading, handleLogin, signOut: () => supabase.auth.signOut() }}>
@@ -113,9 +133,115 @@ export const AuthProvider = ({ children }) => {
         }}>
           Restoring session...
         </div>
-      ) : children}
+      ) : (
+        <>
+          {children}
+          {authNotice && (
+            <div style={noticeStyles.shell} role="status" aria-live="polite">
+              <div style={{ ...noticeStyles.icon, ...noticeToneStyles[authNotice.tone]?.icon }}>
+                {authNotice.tone === 'success' ? '✓' : authNotice.tone === 'error' ? '!' : 'i'}
+              </div>
+              <div style={noticeStyles.copy}>
+                <strong style={noticeStyles.title}>{authNotice.title}</strong>
+                <span style={noticeStyles.message}>{authNotice.message}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAuthNotice(null)}
+                style={noticeStyles.close}
+                aria-label="Dismiss notification"
+              >
+                x
+              </button>
+            </div>
+          )}
+        </>
+      )}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+const noticeStyles = {
+  shell: {
+    position: 'fixed',
+    top: 22,
+    right: 22,
+    zIndex: 2000,
+    width: 'min(420px, calc(100vw - 32px))',
+    display: 'grid',
+    gridTemplateColumns: '38px 1fr 28px',
+    gap: 12,
+    alignItems: 'center',
+    padding: '14px 14px',
+    borderRadius: 16,
+    border: '1px solid rgba(126, 184, 255, 0.18)',
+    background: 'rgba(8, 18, 40, 0.94)',
+    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255,255,255,0.05)',
+    backdropFilter: 'blur(18px) saturate(145%)',
+    color: 'white',
+  },
+  icon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 16,
+    fontWeight: 900,
+    background: 'rgba(59, 130, 246, 0.14)',
+    color: '#93c5fd',
+    border: '1px solid rgba(147, 197, 253, 0.24)',
+  },
+  copy: {
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 3,
+  },
+  title: {
+    fontSize: 13,
+    lineHeight: 1.2,
+    color: 'rgba(245, 250, 255, 0.96)',
+  },
+  message: {
+    fontSize: 12,
+    lineHeight: 1.45,
+    color: 'rgba(190, 215, 255, 0.62)',
+  },
+  close: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    border: '1px solid transparent',
+    background: 'transparent',
+    color: 'rgba(190, 215, 255, 0.45)',
+    cursor: 'pointer',
+    fontWeight: 800,
+  },
+};
+
+const noticeToneStyles = {
+  success: {
+    icon: {
+      background: 'rgba(34, 197, 94, 0.14)',
+      color: '#86efac',
+      border: '1px solid rgba(134, 239, 172, 0.24)',
+    },
+  },
+  error: {
+    icon: {
+      background: 'rgba(239, 68, 68, 0.14)',
+      color: '#fca5a5',
+      border: '1px solid rgba(252, 165, 165, 0.24)',
+    },
+  },
+  pending: {
+    icon: {
+      background: 'rgba(59, 130, 246, 0.14)',
+      color: '#93c5fd',
+      border: '1px solid rgba(147, 197, 253, 0.24)',
+    },
+  },
+};
+

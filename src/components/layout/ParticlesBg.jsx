@@ -1,5 +1,33 @@
 import { useEffect, useRef } from 'react';
 
+class Particle {
+  constructor(canvas) {
+    this.x = Math.random() * canvas.width;
+    this.y = Math.random() * canvas.height;
+    this.size = Math.random() * 1.8 + 0.2;
+    this.speedX = Math.random() * 0.3 - 0.15;
+    this.speedY = Math.random() * 0.3 - 0.15;
+    this.opacity = Math.random() * 0.6 + 0.1;
+  }
+
+  update(canvas) {
+    this.x += this.speedX;
+    this.y += this.speedY;
+
+    if (this.x > canvas.width) this.x = 0;
+    if (this.x < 0) this.x = canvas.width;
+    if (this.y > canvas.height) this.y = 0;
+    if (this.y < 0) this.y = canvas.height;
+  }
+
+  draw(ctx) {
+    ctx.fillStyle = `rgba(180, 210, 255, ${this.opacity})`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function ParticlesBg() {
   const canvasRef = useRef(null);
 
@@ -16,47 +44,18 @@ function ParticlesBg() {
     window.addEventListener('resize', resizeCanvas);
 
     const particles = [];
-    const particleCount = 70; // Saktong dami lang para hindi masapawan ang clouds mo
-
-    class Particle {
-      constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
-        this.size = Math.random() * 1.8 + 0.2; // Iba't ibang laki ng bituin
-        this.speedX = Math.random() * 0.3 - 0.15; // Swabe at mabagal lang ang galaw
-        this.speedY = Math.random() * 0.3 - 0.15;
-        this.opacity = Math.random() * 0.6 + 0.1;
-      }
-
-      update() {
-        this.x += this.speedX;
-        this.y += this.speedY;
-
-        // Pag lumabas sa screen, lilitaw sa kabilang side (wrapping)
-        if (this.x > canvas.width) this.x = 0;
-        if (this.x < 0) this.x = canvas.width;
-        if (this.y > canvas.height) this.y = 0;
-        if (this.y < 0) this.y = canvas.height;
-      }
-
-      draw() {
-        ctx.fillStyle = `rgba(180, 210, 255, ${this.opacity})`; // Kulay blueish-white na katulad ng code mo
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+    const particleCount = 70;
 
     for (let i = 0; i < particleCount; i++) {
-      particles.push(new Particle());
+      particles.push(new Particle(canvas));
     }
 
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
       particles.forEach(particle => {
-        particle.update();
-        particle.draw();
+        particle.update(canvas);
+        particle.draw(ctx);
       });
 
       animationFrameId = requestAnimationFrame(animate);
@@ -75,7 +74,7 @@ function ParticlesBg() {
       style={{
         position: 'absolute',
         inset: 0,
-        zIndex: 1, // Nakapatong sa static stars pero nasa ilalim ng main layout
+        zIndex: 1,
         pointerEvents: 'none',
       }}
     />
