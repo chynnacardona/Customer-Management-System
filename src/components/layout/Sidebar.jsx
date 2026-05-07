@@ -1,10 +1,16 @@
 import { useState } from 'react'
-import { Users, ShoppingCart, Package, ShieldCheck, LayoutDashboard, Search, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Users, ShoppingCart, Package, ShieldCheck, LayoutDashboard, Search, LogOut, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import neuLogo from '../../assets/neu-logo.png'
 
 function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
+  const { user: authUser } = useAuth()
+
+  // para kay M4: palitan/ikabit sa final AuthContext or UserRightsContext user_type value kapag finalized na
+  const userType = authUser?.user_type ?? 'ADMIN'
+  const canViewDeletedCustomers = userType === 'ADMIN' || userType === 'SUPERADMIN'
 
   const sections = [
     {
@@ -16,20 +22,29 @@ function Sidebar() {
     {
       label: 'Management',
       items: [
-        { icon: Users, label: 'Customers', path: '/lookups/customers' },
+        { icon: Users, label: 'Customers', path: '/customers' },
         { icon: ShoppingCart, label: 'Sales', path: '/sales' },
-        { icon: Package, label: 'Products', path: '/lookups/products' },
+        { icon: Package, label: 'Products', path: '/products' },
       ]
     },
     {
       label: 'System',
       items: [
         { icon: ShieldCheck, label: 'Admin', path: '/admin' },
+        // para kay M4: hidden dapat ito kapag USER; ADMIN/SUPERADMIN lang ang may Deleted Customers access
+        ...(canViewDeletedCustomers
+          ? [{ icon: Trash2, label: 'Deleted Customers', path: '/deleted-customers' }]
+          : []),
       ]
     },
   ]
 
-  const user = { email: 'user@hope.com', initials: 'U' }
+  // para kay M4: palitan display fields kapag final user profile fields are ready
+  const user = {
+    email: authUser?.email ?? 'admin@hope.com',
+    initials: authUser?.email?.charAt(0).toUpperCase() ?? 'A',
+    role: userType,
+  }
 
   return (
     <>
@@ -553,7 +568,7 @@ function Sidebar() {
           <div className="user-avatar">{user.initials}</div>
           <div className="user-info">
             <span className="user-email">{user.email}</span>
-            <span className="user-role">User</span>
+            <span className="user-role">{user.role}</span>
           </div>
           <button className="logout-btn" title="Sign out">
             <LogOut size={13} />
