@@ -5,9 +5,20 @@ import AddCustomerModal from '../../components/shared/AddCustomerModal'
 import EditCustomerModal from '../../components/shared/EditCustomerModal'
 import SoftDeleteConfirmDialog from '../../components/shared/SoftDeleteConfirmDialog'
 import { customerService } from '../../services/customerService'
+import { useRights } from '../../context/UserRightsContext';
+
 
 function CustomerListPage() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
+  
+  // 1. GET THE RIGHTS FROM CONTEXT
+  const { rights, userType, rightsLoading } = useRights();
+
+  // 2. ADD THESE LOGS FOR TESTING
+  console.log("--- TEST: RIGHTS CHECK ---");
+  console.log("User Role:", userType);
+  console.log("Permissions:", rights);
+
   
   // LIVE DATABASE STATES
   const [customers, setCustomers] = useState([])

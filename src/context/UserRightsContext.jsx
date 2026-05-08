@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../supabase/supabaseClient';
 import { useAuth } from './AuthContext';
 
 const UserRightsContext = createContext({});
@@ -7,22 +7,14 @@ const UserRightsContext = createContext({});
 export const UserRightsProvider = ({ children }) => {
   const { user } = useAuth();
   const [rights, setRights] = useState({
-    CUST_VIEW: 0,
-    CUST_ADD: 0,
-    CUST_EDIT: 0,
-    CUST_DEL: 0,
-    SALES_VIEW: 0,
-    SD_VIEW: 0,
-    PROD_VIEW: 0,
-    PRICE_VIEW: 0,
-    ADM_USER: 0,
+    CUST_VIEW: 0, CUST_ADD: 0, CUST_EDIT: 0, CUST_DEL: 0,
+    SALES_VIEW: 0, SD_VIEW: 0, PROD_VIEW: 0, PRICE_VIEW: 0, ADM_USER: 0,
   });
   const [userType, setUserType] = useState(null);
   const [rightsLoading, setRightsLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
-      // Reset everything on logout
       setRights({
         CUST_VIEW: 0, CUST_ADD: 0, CUST_EDIT: 0, CUST_DEL: 0,
         SALES_VIEW: 0, SD_VIEW: 0, PROD_VIEW: 0, PRICE_VIEW: 0, ADM_USER: 0,
@@ -34,37 +26,39 @@ export const UserRightsProvider = ({ children }) => {
 
     const fetchRights = async () => {
       setRightsLoading(true);
+      try {
+        // 1. Fetches user metadata (Uses 'userId' to match your Auth table)
+        const { data: userData, error: userError } = await supabase
+          .from('user')
+          .select('userId, user_type') 
+          .eq('email', user.email)
+          .single();
 
-      // 1. Get user's role/type from public.user table
-      const { data: userData } = await supabase
-        .from('user')
-        .select('user_id, role')
-        .eq('email', user.email)
-        .single();
+        if (userError || !userData) {
+          setRightsLoading(false);
+          return;
+        }
 
-      if (!userData) {
+        setUserType(userData.user_type);
+
+        // 2. Fetches rights (Uses the specific table name that worked for you)
+        const { data: rightsData } = await supabase
+          .from('usermodule_rights')
+          .select('right_id, is_allowed')
+          .eq('userId', userData.userId);
+
+        if (rightsData) {
+          const rightsMap = {};
+          rightsData.forEach(row => {
+            rightsMap[row.right_id] = row.is_allowed;
+          });
+          setRights(prev => ({ ...prev, ...rightsMap }));
+        }
+      } catch (err) {
+        // Errors are caught silently for a cleaner production UI
+      } finally {
         setRightsLoading(false);
-        return;
       }
-
-      setUserType(userData.role); // 'SUPERADMIN', 'ADMIN', or 'USER'
-
-      // 2. Get all 9 rights rows for this user
-      const { data: rightsData } = await supabase
-        .from('UserModule_Rights')
-        .select('right_id, is_allowed')
-        .eq('user_id', userData.user_id);
-
-      if (rightsData) {
-        // Convert array of rows into a flat object { CUST_VIEW: 1, CUST_ADD: 0, ... }
-        const rightsMap = {};
-        rightsData.forEach(row => {
-          rightsMap[row.right_id] = row.is_allowed;
-        });
-        setRights(prev => ({ ...prev, ...rightsMap }));
-      }
-
-      setRightsLoading(false);
     };
 
     fetchRights();
