@@ -212,25 +212,30 @@ function Dashboard() {
         }
 
         .dashboard-page {
-          min-height: 100%;
+          height: calc(100vh - 48px);
+          min-height: 0;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 8px;
+          overflow: hidden;
           animation: dashboardIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
 
         .dashboard-shell {
+          flex: 1;
+          min-height: 0;
           display: grid;
-          grid-template-columns: minmax(0, 1fr) 300px;
-          gap: 12px;
-          align-items: start;
+          grid-template-columns: minmax(0, 1fr) 284px;
+          gap: 8px;
+          align-items: stretch;
         }
 
         .dashboard-main,
         .dashboard-side {
+          min-height: 0;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 8px;
         }
 
         .glass-panel {
@@ -251,17 +256,17 @@ function Dashboard() {
         .ops-item:hover,
         .insight-item:hover,
         .status-pill:hover {
-          transform: translateY(-2px);
+          transform: translateY(-1px);
           border-color: rgba(126, 184, 255, 0.22);
           box-shadow: 0 18px 38px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
 
         .dashboard-hero {
-          min-height: 142px;
+          min-height: 108px;
           display: grid;
-          grid-template-columns: minmax(0, 1fr) 176px;
-          gap: 12px;
-          padding: 12px;
+          grid-template-columns: minmax(0, 1fr) 150px;
+          gap: 10px;
+          padding: 10px;
         }
 
         .hero-copy {
@@ -276,21 +281,21 @@ function Dashboard() {
           align-items: center;
           width: fit-content;
           gap: 7px;
-          padding: 6px 9px;
+          padding: 5px 8px;
           border-radius: 999px;
           border: 1px solid rgba(110, 231, 183, 0.18);
           background: rgba(16, 185, 129, 0.1);
           color: rgba(167, 243, 208, 0.92);
-          font-size: 10px;
+          font-size: 9.5px;
           font-weight: 800;
           letter-spacing: 0.08em;
           text-transform: uppercase;
         }
 
         .hero-title {
-          margin: 12px 0 6px;
+          margin: 8px 0 4px;
           color: rgba(246, 250, 255, 0.98);
-          font-size: 25px;
+          font-size: 21px;
           line-height: 1.05;
           font-weight: 850;
         }
@@ -299,35 +304,35 @@ function Dashboard() {
           max-width: 560px;
           margin: 0;
           color: rgba(203, 224, 255, 0.5);
-          font-size: 12px;
-          line-height: 1.45;
+          font-size: 11px;
+          line-height: 1.35;
         }
 
         .hero-meta {
           display: flex;
           flex-wrap: wrap;
-          gap: 8px;
-          margin-top: 12px;
+          gap: 6px;
+          margin-top: 8px;
         }
 
         .hero-chip {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          min-height: 29px;
-          padding: 0 10px;
+          min-height: 25px;
+          padding: 0 8px;
           border-radius: 10px;
           border: 1px solid rgba(150, 190, 255, 0.13);
           background: rgba(4, 12, 26, 0.32);
           color: rgba(211, 230, 255, 0.72);
-          font-size: 11px;
+          font-size: 10.5px;
           font-weight: 700;
         }
 
         .hero-orbit {
           position: relative;
-          min-height: 114px;
-          border-radius: 16px;
+          min-height: 88px;
+          border-radius: 14px;
           border: 1px solid rgba(150, 190, 255, 0.13);
           background:
             linear-gradient(160deg, rgba(28, 49, 76, 0.78), rgba(10, 21, 37, 0.58)),
@@ -337,7 +342,7 @@ function Dashboard() {
 
         .hero-meter {
           position: absolute;
-          inset: 14px;
+          inset: 11px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -353,7 +358,7 @@ function Dashboard() {
 
         .meter-value {
           color: white;
-          font-size: 34px;
+          font-size: 28px;
           line-height: 1;
           font-weight: 850;
           font-variant-numeric: tabular-nums;
@@ -375,13 +380,13 @@ function Dashboard() {
         .stats-grid {
           display: grid;
           grid-template-columns: 1.15fr 1fr 1fr 1.25fr;
-          gap: 9px;
+          gap: 7px;
         }
 
         .stat-card {
-          min-height: 86px;
-          padding: 10px;
-          border-radius: 16px;
+          min-height: 66px;
+          padding: 8px;
+          border-radius: 13px;
           border: 1px solid rgba(150, 190, 255, 0.12);
           background: rgba(8, 18, 34, 0.58);
           backdrop-filter: blur(16px);
@@ -415,8 +420,8 @@ function Dashboard() {
         }
 
         .stat-icon {
-          width: 31px;
-          height: 31px;
+          width: 27px;
+          height: 27px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -428,9 +433,9 @@ function Dashboard() {
         }
 
         .stat-value {
-          margin-top: 9px;
+          margin-top: 5px;
           color: rgba(248, 252, 255, 0.98);
-          font-size: 20px;
+          font-size: 17px;
           line-height: 1;
           font-weight: 850;
           font-variant-numeric: tabular-nums;
@@ -438,9 +443,9 @@ function Dashboard() {
         }
 
         .stat-detail {
-          margin-top: 5px;
+          margin-top: 3px;
           color: rgba(203, 224, 255, 0.48);
-          font-size: 11.5px;
+          font-size: 10.5px;
         }
 
         .stat-card.violet .stat-icon { color: rgba(196, 181, 253, 0.95); background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.18); }
@@ -448,7 +453,7 @@ function Dashboard() {
         .stat-card.green .stat-icon { color: rgba(134, 239, 172, 0.95); background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.18); }
 
         .health-panel {
-          padding: 12px;
+          padding: 9px 10px;
         }
 
         .panel-title {
@@ -456,37 +461,37 @@ function Dashboard() {
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          margin-bottom: 10px;
+          margin-bottom: 7px;
         }
 
         .panel-title h2 {
           margin: 0;
           color: rgba(246, 250, 255, 0.94);
-          font-size: 14px;
+          font-size: 12.5px;
           font-weight: 850;
         }
 
         .panel-title span {
           color: rgba(203, 224, 255, 0.36);
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 700;
         }
 
         .health-list {
           display: grid;
-          gap: 8px;
+          gap: 5px;
         }
 
         .health-row {
           display: grid;
-          grid-template-columns: 28px minmax(0, 1fr) 42px;
+          grid-template-columns: 24px minmax(0, 1fr) 38px;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
         }
 
         .health-icon {
-          width: 28px;
-          height: 28px;
+          width: 24px;
+          height: 24px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -498,13 +503,13 @@ function Dashboard() {
         .health-name {
           display: block;
           color: rgba(225, 239, 255, 0.82);
-          font-size: 12px;
+          font-size: 10.8px;
           font-weight: 750;
         }
 
         .health-track {
-          height: 7px;
-          margin-top: 7px;
+          height: 5px;
+          margin-top: 4px;
           border-radius: 999px;
           background: rgba(255, 255, 255, 0.08);
           overflow: hidden;
@@ -525,48 +530,48 @@ function Dashboard() {
         }
 
         .side-card {
-          padding: 12px;
+          padding: 9px 10px;
         }
 
         .main-lower-grid {
           display: grid;
           grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
-          gap: 10px;
+          gap: 8px;
           align-items: stretch;
         }
 
         .analytics-grid {
           display: grid;
           grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-          gap: 10px;
+          gap: 8px;
         }
 
         .analytics-panel {
-          padding: 10px 12px;
+          padding: 8px 10px;
           display: flex;
           flex-direction: column;
         }
 
         .chart-stack {
           display: grid;
-          gap: 7px;
+          gap: 5px;
         }
 
         .bar-row {
           display: grid;
           grid-template-columns: 48px minmax(0, 1fr) 38px;
           align-items: center;
-          gap: 10px;
+          gap: 8px;
         }
 
         .bar-label {
           color: rgba(225, 239, 255, 0.78);
-          font-size: 12px;
+          font-size: 10.5px;
           font-weight: 800;
         }
 
         .bar-track {
-          height: 8px;
+          height: 6px;
           border-radius: 999px;
           background: rgba(255, 255, 255, 0.08);
           overflow: hidden;
@@ -581,7 +586,7 @@ function Dashboard() {
 
         .bar-value {
           color: rgba(235, 245, 255, 0.9);
-          font-size: 12px;
+          font-size: 10.5px;
           font-weight: 850;
           text-align: right;
           font-variant-numeric: tabular-nums;
@@ -589,13 +594,13 @@ function Dashboard() {
 
         .donut-panel {
           display: grid;
-          grid-template-columns: 92px minmax(0, 1fr);
+          grid-template-columns: 70px minmax(0, 1fr);
           align-items: center;
-          gap: 12px;
+          gap: 9px;
         }
 
         .donut {
-          width: 92px;
+          width: 70px;
           aspect-ratio: 1;
           border-radius: 50%;
           display: grid;
@@ -609,7 +614,7 @@ function Dashboard() {
 
         .donut strong {
           color: white;
-          font-size: 19px;
+          font-size: 15px;
           line-height: 1;
           font-weight: 900;
         }
@@ -618,7 +623,7 @@ function Dashboard() {
           display: block;
           margin-top: 4px;
           color: rgba(203, 224, 255, 0.42);
-          font-size: 10px;
+          font-size: 8.5px;
           font-weight: 800;
           text-align: center;
           letter-spacing: 0.08em;
@@ -627,7 +632,7 @@ function Dashboard() {
 
         .status-list {
           display: grid;
-          gap: 7px;
+          gap: 5px;
         }
 
         .status-pill {
@@ -635,8 +640,8 @@ function Dashboard() {
           justify-content: space-between;
           align-items: center;
           gap: 10px;
-          padding: 8px 10px;
-          border-radius: 12px;
+          padding: 6px 8px;
+          border-radius: 10px;
           background: rgba(100, 160, 255, 0.05);
           border: 1px solid rgba(150, 190, 255, 0.09);
         }
@@ -661,13 +666,13 @@ function Dashboard() {
 
         .status-name {
           color: rgba(225, 239, 255, 0.8);
-          font-size: 12px;
+          font-size: 10.5px;
           font-weight: 800;
         }
 
         .status-number {
           color: rgba(248, 252, 255, 0.94);
-          font-size: 13px;
+          font-size: 11px;
           font-weight: 900;
           font-variant-numeric: tabular-nums;
         }
@@ -675,16 +680,16 @@ function Dashboard() {
         .price-band-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 8px;
+          gap: 6px;
           align-items: stretch;
         }
 
         .price-band {
-          min-height: 82px;
-          border-radius: 14px;
+          min-height: 58px;
+          border-radius: 11px;
           border: 1px solid rgba(150, 190, 255, 0.1);
           background: linear-gradient(180deg, rgba(96, 165, 250, 0.11), rgba(8, 18, 34, 0.35));
-          padding: 10px;
+          padding: 8px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -693,21 +698,21 @@ function Dashboard() {
 
         .price-band-label {
           color: rgba(225, 239, 255, 0.86);
-          font-size: 12px;
+          font-size: 10.8px;
           font-weight: 850;
         }
 
         .price-band-hint {
           display: block;
-          margin-top: 5px;
+          margin-top: 3px;
           color: rgba(203, 224, 255, 0.36);
-          font-size: 10.5px;
-          line-height: 1.35;
+          font-size: 9px;
+          line-height: 1.2;
         }
 
         .price-band-value {
           color: white;
-          font-size: 22px;
+          font-size: 17px;
           font-weight: 900;
           line-height: 1;
           font-variant-numeric: tabular-nums;
@@ -715,22 +720,22 @@ function Dashboard() {
 
         .ops-card {
           display: grid;
-          gap: 8px;
+          gap: 6px;
           align-content: stretch;
         }
 
         .ops-item {
-          border-radius: 13px;
+          border-radius: 10px;
           border: 1px solid rgba(150, 190, 255, 0.09);
           background: rgba(100, 160, 255, 0.045);
-          padding: 10px;
+          padding: 8px;
           transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
         }
 
         .ops-label {
           display: block;
           color: rgba(203, 224, 255, 0.38);
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 850;
           letter-spacing: 0.1em;
           text-transform: uppercase;
@@ -738,9 +743,9 @@ function Dashboard() {
 
         .ops-value {
           display: block;
-          margin-top: 7px;
+          margin-top: 4px;
           color: rgba(248, 252, 255, 0.95);
-          font-size: 20px;
+          font-size: 16px;
           font-weight: 900;
           font-variant-numeric: tabular-nums;
         }
@@ -753,28 +758,28 @@ function Dashboard() {
         .main-insights {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 10px;
+          gap: 8px;
         }
 
         .main-insights .insight-item {
-          min-height: 86px;
+          min-height: 58px;
         }
 
         .graph-panel {
-          padding: 12px;
-          min-height: 220px;
+          padding: 9px 10px;
+          min-height: 132px;
           display: flex;
           flex-direction: column;
         }
 
         .column-chart {
           flex: 1;
-          min-height: 150px;
+          min-height: 78px;
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
           align-items: end;
-          gap: 12px;
-          padding: 10px 4px 0;
+          gap: 9px;
+          padding: 4px 4px 0;
         }
 
         .chart-column {
@@ -782,12 +787,12 @@ function Dashboard() {
           display: grid;
           grid-template-rows: 1fr auto auto;
           align-items: end;
-          gap: 7px;
+          gap: 4px;
           height: 100%;
         }
 
         .column-track {
-          height: 126px;
+          height: 72px;
           display: flex;
           align-items: flex-end;
           border-radius: 14px;
@@ -815,7 +820,7 @@ function Dashboard() {
 
         .column-value {
           color: rgba(248, 252, 255, 0.95);
-          font-size: 15px;
+          font-size: 12px;
           font-weight: 900;
           text-align: center;
           font-variant-numeric: tabular-nums;
@@ -823,7 +828,7 @@ function Dashboard() {
 
         .column-label {
           color: rgba(203, 224, 255, 0.42);
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 850;
           text-align: center;
           letter-spacing: 0.08em;
@@ -834,28 +839,28 @@ function Dashboard() {
         }
 
         .coverage-panel {
-          padding: 12px;
+          padding: 9px 10px;
           display: flex;
           flex-direction: column;
-          min-height: 220px;
+          min-height: 132px;
         }
 
         .coverage-grid {
           flex: 1;
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 8px;
+          gap: 6px;
         }
 
         .coverage-card {
-          border-radius: 14px;
+          border-radius: 11px;
           border: 1px solid rgba(150, 190, 255, 0.09);
           background: rgba(100, 160, 255, 0.045);
-          padding: 10px;
+          padding: 8px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          min-height: 82px;
+          min-height: 54px;
           transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
         }
 
@@ -872,15 +877,15 @@ function Dashboard() {
         }
 
         .coverage-icon {
-          width: 26px;
-          height: 26px;
+          width: 22px;
+          height: 22px;
           border-radius: 9px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           background: rgba(96, 165, 250, 0.12);
           color: rgba(191, 219, 254, 0.96);
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 900;
           flex-shrink: 0;
         }
@@ -888,30 +893,30 @@ function Dashboard() {
         .coverage-label {
           min-width: 0;
           color: rgba(225, 239, 255, 0.82);
-          font-size: 11.5px;
+          font-size: 10px;
           font-weight: 850;
           line-height: 1.15;
         }
 
         .coverage-value {
-          margin-top: 8px;
+          margin-top: 4px;
           color: white;
-          font-size: 22px;
+          font-size: 16px;
           font-weight: 900;
           line-height: 1;
           font-variant-numeric: tabular-nums;
         }
 
         .coverage-caption {
-          margin-top: 4px;
+          margin-top: 2px;
           color: rgba(203, 224, 255, 0.38);
-          font-size: 10.5px;
-          line-height: 1.25;
+          font-size: 9px;
+          line-height: 1.15;
         }
 
         .insight-item {
-          padding: 10px;
-          border-radius: 13px;
+          padding: 8px;
+          border-radius: 11px;
           border: 1px solid rgba(150, 190, 255, 0.09);
           background: linear-gradient(135deg, rgba(96, 165, 250, 0.08), rgba(52, 211, 153, 0.04));
           transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
@@ -920,7 +925,7 @@ function Dashboard() {
         .insight-label {
           display: block;
           color: rgba(203, 224, 255, 0.38);
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 850;
           letter-spacing: 0.1em;
           text-transform: uppercase;
@@ -928,29 +933,29 @@ function Dashboard() {
 
         .insight-value {
           display: block;
-          margin-top: 6px;
+          margin-top: 4px;
           color: rgba(248, 252, 255, 0.96);
-          font-size: 15px;
+          font-size: 12px;
           font-weight: 900;
         }
 
         .insight-detail {
           display: block;
-          margin-top: 4px;
+          margin-top: 2px;
           color: rgba(203, 224, 255, 0.45);
-          font-size: 11px;
-          line-height: 1.35;
+          font-size: 9.5px;
+          line-height: 1.2;
         }
 
         .role-card {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 9px;
         }
 
         .role-icon {
-          width: 38px;
-          height: 38px;
+          width: 30px;
+          height: 30px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -964,7 +969,7 @@ function Dashboard() {
         .role-label {
           display: block;
           color: rgba(203, 224, 255, 0.38);
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 850;
           letter-spacing: 0.12em;
           text-transform: uppercase;
@@ -972,15 +977,15 @@ function Dashboard() {
 
         .role-value {
           display: block;
-          margin-top: 4px;
+          margin-top: 2px;
           color: rgba(248, 252, 255, 0.95);
-          font-size: 15px;
+          font-size: 12px;
           font-weight: 850;
         }
 
         .mini-stack {
           display: grid;
-          gap: 6px;
+          gap: 3px;
         }
 
         .mini-row {
@@ -988,7 +993,7 @@ function Dashboard() {
           justify-content: space-between;
           align-items: center;
           gap: 10px;
-          padding: 9px 0;
+          padding: 5px 0;
           border-bottom: 1px solid rgba(150, 190, 255, 0.08);
         }
 
@@ -998,19 +1003,19 @@ function Dashboard() {
 
         .mini-label {
           color: rgba(203, 224, 255, 0.46);
-          font-size: 12px;
+          font-size: 10.5px;
           font-weight: 700;
         }
 
         .mini-value {
           color: rgba(248, 252, 255, 0.92);
-          font-size: 13px;
+          font-size: 11.5px;
           font-weight: 850;
           font-variant-numeric: tabular-nums;
         }
 
         .dashboard-state {
-          min-height: 360px;
+          height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
