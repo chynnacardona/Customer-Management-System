@@ -5,7 +5,7 @@ import AddCustomerModal from '../../components/shared/AddCustomerModal'
 import EditCustomerModal from '../../components/shared/EditCustomerModal'
 import SoftDeleteConfirmDialog from '../../components/shared/SoftDeleteConfirmDialog'
 import { customerService } from '../../services/customerService'
-import { useRights } from '../../context/UserRightsContext'
+import { useRights } from '../../context/useRights'
 
 function CustomerListPage() {
   const navigate = useNavigate()
@@ -15,6 +15,8 @@ function CustomerListPage() {
   const canAddCustomer = rights.CUST_ADD === 1
   const canEditCustomer = rights.CUST_EDIT === 1
   const canDeleteCustomer = rights.CUST_DEL === 1
+  const canSeeStamp = userType === 'ADMIN' || userType === 'SUPERADMIN'
+  const tableColumnCount = canSeeStamp ? 7 : 6
   
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -166,13 +168,14 @@ function CustomerListPage() {
                   <th>Address</th>
                   <th>Pay Term</th>
                   <th>Status</th>
+                  {canSeeStamp && <th>Stamp</th>}
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={tableColumnCount}>
                       <div className="empty-state">
                         <Loader2 className="animate-spin mb-2 mx-auto text-blue-400" />
                         <p>Fetching records from database...</p>
@@ -181,7 +184,7 @@ function CustomerListPage() {
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={tableColumnCount}>
                       <div className="empty-state">No customers found.</div>
                     </td>
                   </tr>
@@ -204,6 +207,7 @@ function CustomerListPage() {
                             {customer.record_status}
                           </span>
                         </td>
+                        {canSeeStamp && <td>{customer.stamp || '-'}</td>}
                         <td>
                           <div className="action-cell">
                             <button className="action-btn view" onClick={(e) => handleViewClick(e, customer)}>

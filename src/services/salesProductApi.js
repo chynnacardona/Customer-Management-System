@@ -40,22 +40,6 @@ export const getSales = async () => {
   return data;
 };
 
-export const updateAccountStatus = async (custno, newStatus) => {
-  const { error } = await supabase
-    .from('customer')
-    .update({ record_status: newStatus })
-    .eq('custno', custno);
-  if (error) throw error;
-};
-
-export const softDeleteCustomer = async (custno) => {
-  const { error } = await supabase
-    .from('customer')
-    .update({ record_status: 'INACTIVE' }) 
-    .eq('custno', custno);
-  if (error) throw error;
-};
-
 export const getSalesDetail = async (transno) => {
   const { data, error } = await supabase
     .from('salesdetail')
@@ -104,5 +88,16 @@ export const getCurrentPrice = async (prodCode) => {
     
   if (error && error.code !== 'PGRST116') throw error;
   return data?.unitprice || 0;
+};
+
+export const getPriceHistory = async (prodCode) => {
+  const { data, error } = await supabase
+    .from('pricehist')
+    .select('effdate, unitprice')
+    .eq('prodcode', prodCode)
+    .order('effdate', { ascending: false });
+
+  if (error) throw error;
+  return data;
 };
 

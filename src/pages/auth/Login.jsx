@@ -7,7 +7,6 @@ function Login() {
   const canvasRef = useRef(null)
   const navigate = useNavigate()
 
-  // --- Eto yung mga kulang na State ---
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -68,7 +67,6 @@ function Login() {
 
   
 
-  // --- Eto yung Login Function ---
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -83,11 +81,6 @@ function Login() {
         .eq('email', email.trim().toLowerCase())
         .maybeSingle()
 
-      if (dbError) {
-        console.warn('Unable to check user profile before login:', dbError.message)
-      }
-
-      // 2. Subukan ang manual login via Auth
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password,
@@ -96,10 +89,8 @@ function Login() {
       if (authError) {
         setIsError(true)
         
-        // Dito papasok yung "Hint" logic
-        if (authError.message.includes("Invalid login credentials")) {
+        if (authError.message.includes("Invalid login credentials") && !dbError) {
           if (dbUser) {
-            // Kung andun sa table pero mali ang credentials, malamang Google account to
             setErrorMsg("Invalid credentials. If you used Google before, please use the Google button.")
           } else {
             setErrorMsg("Account not found. Please register first.")
@@ -110,16 +101,14 @@ function Login() {
       } else if (data?.user) {
         navigate('/dashboard')
       }
-    } catch (error) {
+    } catch {
       setIsError(true)
       setErrorMsg("An unexpected error occurred.")
-      console.error(error)
     } finally {
       setLoading(false)
     }
   }
 
-  // --- Google Login Function ---
   const handleGoogleLogin = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -297,7 +286,6 @@ function Login() {
         <div className="absolute inset-0 z-0 pointer-events-none"
           style={{ background: 'radial-gradient(ellipse at 50% 60%, rgba(20, 60, 180, 0.12) 0%, transparent 70%)' }} />
 
-        {/* Card - Balutin sa FORM para gumana yung Enter key */}
         <form 
           onSubmit={handleLogin} 
           className={`apple-card relative z-10 w-full mx-4 p-8 ${isError ? 'shake-error' : ''}`} 
@@ -318,11 +306,11 @@ function Login() {
             <input 
               type="email" 
               placeholder="Enter your email" 
-              className={`glow-input ${isError ? 'error-glow' : ''}`} // Magpupula ito pag may error
+              className={`glow-input ${isError ? 'error-glow' : ''}`}
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
-                setIsError(false); // Mawawala yung pula pag nag-type ulit
+                setIsError(false);
               }}
               required
             />
@@ -336,11 +324,11 @@ function Login() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
-                className={`glow-input mb-1.5 ${isError ? 'error-glow' : ''}`} // Magpupula rin ito
+                className={`glow-input mb-1.5 ${isError ? 'error-glow' : ''}`}
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
-                  setIsError(false); // Mawawala yung pula pag nag-type ulit
+                  setIsError(false);
                 }}
                 required
               />
@@ -350,13 +338,8 @@ function Login() {
             </div>
           </div>
 
-          <div className="flex justify-end mb-5">
-            <Link to="/forgot-password" style={{ color: '#7eb8ff' }} className="text-xs">Forgot password?</Link>
-          </div>
-
-          {/* ETO YUNG MESSAGE SA BABA - Dynamic na dapat ito */}
           {isError && (
-            <div className="mb-4 text-center">
+            <div className="mb-5 text-center">
               <p className="text-[11px] font-medium px-4" style={{ color: '#ff9494', lineHeight: '1.4' }}>
                 {errorMsg}
               </p>
@@ -372,7 +355,6 @@ function Login() {
             Sign in with Google
           </button>
 
-          {/* Divider at Register Link */}
           <div className="text-center pt-4 mt-2 border-t border-white/5">
             <p className="text-xs" style={{ color: 'rgba(180, 210, 255, 0.45)' }}>
               No account yet?{' '}

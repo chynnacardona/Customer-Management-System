@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/useAuth'
+import { useRights } from '../../context/useRights'
 import neuLogo from '../../assets/neu-logo.png'
 
 function Sidebar() {
@@ -20,8 +21,10 @@ function Sidebar() {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const navigate = useNavigate()
   const { user: authUser, signOut } = useAuth()
+  const { rights, userType: rightsUserType } = useRights()
 
-  const userType = authUser?.user_type ?? 'USER'
+  const userType = rightsUserType ?? authUser?.user_type ?? 'USER'
+  const canViewAdmin = rights.ADM_USER === 1
   const canViewDeletedCustomers = userType === 'ADMIN' || userType === 'SUPERADMIN'
 
   const sections = [
@@ -42,7 +45,9 @@ function Sidebar() {
     {
       label: 'System',
       items: [
-        { icon: ShieldCheck, label: 'Admin', path: '/admin' },
+        ...(canViewAdmin
+          ? [{ icon: ShieldCheck, label: 'Admin', path: '/admin' }]
+          : []),
         ...(canViewDeletedCustomers
           ? [{ icon: Trash2, label: 'Deleted Customers', path: '/deleted-customers' }]
           : []),
@@ -68,8 +73,7 @@ function Sidebar() {
       await signOut()
       setShowLogoutConfirm(false)
       navigate('/login', { replace: true })
-    } catch (err) {
-      console.error('Sign out failed:', err)
+    } catch {
       setIsSigningOut(false)
     }
   }

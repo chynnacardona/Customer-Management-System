@@ -15,8 +15,23 @@ import ProductCatalog from "./pages/products/ProductCatalog";
 import SalesList from "./pages/sales/SalesList";
 import Dashboard from "./pages/dashboard/Dashboard";
 import { useAuth } from "./context/useAuth";
+import { useRights } from "./context/useRights";
 
 function AdminRoute({ children }) {
+  const { rights, rightsLoading } = useRights();
+
+  if (rightsLoading) {
+    return <div className="flex h-screen items-center justify-center">Loading permissions...</div>;
+  }
+
+  if (rights.ADM_USER !== 1) {
+    return <Navigate to="/customers" replace />;
+  }
+
+  return children;
+}
+
+function DeletedCustomersRoute({ children }) {
   const { user } = useAuth();
   const userType = user?.user_type ?? 'USER';
 
@@ -53,8 +68,8 @@ function App() {
           <Route path="customers/:custno" element={<CustomerDetail />} />
           <Route path="sales" element={<SalesList />} />
           <Route path="products" element={<ProductCatalog />} />
-          <Route path="admin" element={<UserManagement />} />
-          <Route path="deleted-customers" element={<AdminRoute><DeletedCustomers /></AdminRoute>} />
+          <Route path="admin" element={<AdminRoute><UserManagement /></AdminRoute>} />
+          <Route path="deleted-customers" element={<DeletedCustomersRoute><DeletedCustomers /></DeletedCustomersRoute>} />
           
           <Route path="*" element={<Navigate to="/customers" replace />} />
         </Route>

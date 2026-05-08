@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../supabase/supabaseClient";
 import { AuthContext } from "./useAuth";
 
@@ -6,12 +6,19 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authNotice, setAuthNotice] = useState(null);
-  const missingProfileWarnedRef = useRef(false);
 
   const showAuthNotice = useCallback((notice) => {
     setAuthNotice(notice);
     window.setTimeout(() => setAuthNotice(null), 5200);
   }, []);
+
+  const signOutWithNotice = useCallback((notice) => {
+    setUser(null);
+    setTimeout(() => {
+      supabase.auth.signOut();
+      showAuthNotice(notice);
+    }, 0);
+  }, [showAuthNotice]);
 
   const handleLogin = async (emailInput) => {
     const { error } = await supabase.auth.signInWithOtp({
@@ -40,7 +47,6 @@ export const AuthProvider = ({ children }) => {
     }
 
     try {
-      // para kay M4: dito papasok yung final login guard/profile query behavior
       const profileQuery = supabase
         .from('user')
         .select('record_status, user_type, email, full_name')
@@ -54,39 +60,41 @@ export const AuthProvider = ({ children }) => {
       const { data: userRow, error } = await Promise.race([profileQuery, timeout]);
 
       if (error) {
-        console.warn("Unable to load user profile. Allowing entry for setup.", error);
-        setUser(sessionUser);
+        signOutWithNotice({
+          tone: 'error',
+          title: 'Profile check failed',
+          message: 'We could not verify your account status. Please try again.',
+        });
         return;
       }
 
       if (!userRow) {
-        if (!missingProfileWarnedRef.current) {
-          console.warn("User profile row not found yet. Allowing entry for UI testing.");
-          missingProfileWarnedRef.current = true;
-        }
-        setUser(sessionUser);
+        signOutWithNotice({
+          tone: 'error',
+          title: 'Account profile missing',
+          message: 'Your account profile is not ready yet. Please contact a Sales Manager.',
+        });
         return;
       }
 
       if (userRow.record_status !== 'ACTIVE') {
-        setUser(null);
-        setTimeout(() => {
-          supabase.auth.signOut();
-          showAuthNotice({
-            tone: 'pending',
-            title: 'Account pending activation',
-            message: 'Registration successful. A Sales Manager needs to activate your account before you can sign in.',
-          });
-        }, 0);
+        signOutWithNotice({
+          tone: 'pending',
+          title: 'Account pending activation',
+          message: 'Registration successful. A Sales Manager needs to activate your account before you can sign in.',
+        });
         return;
       }
 
       setUser({ ...sessionUser, ...userRow });
-    } catch (err) {
-      console.warn("Unable to load user profile. Allowing entry for setup.", err);
-      setUser(sessionUser);
+    } catch {
+      signOutWithNotice({
+        tone: 'error',
+        title: 'Profile check failed',
+        message: 'We could not verify your account status. Please try again.',
+      });
     }
-  }, [showAuthNotice]);
+  }, [signOutWithNotice]);
 
   useEffect(() => {
     let mounted = true;
@@ -139,7 +147,7 @@ export const AuthProvider = ({ children }) => {
           {authNotice && (
             <div style={noticeStyles.shell} role="status" aria-live="polite">
               <div style={{ ...noticeStyles.icon, ...noticeToneStyles[authNotice.tone]?.icon }}>
-                {authNotice.tone === 'success' ? '✓' : authNotice.tone === 'error' ? '!' : 'i'}
+                {authNotice.tone === 'success' ? 'OK' : authNotice.tone === 'error' ? '!' : 'i'}
               </div>
               <div style={noticeStyles.copy}>
                 <strong style={noticeStyles.title}>{authNotice.title}</strong>

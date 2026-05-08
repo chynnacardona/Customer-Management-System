@@ -127,13 +127,83 @@ export default function SalesList() {
         .sales-table-scroll {
           flex: 1;
           min-height: 0;
-          overflow: auto;
+          overflow-x: auto;
+          overflow-y: hidden;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(126, 184, 255, 0.45) rgba(8, 18, 40, 0.28);
+        }
+
+        .sales-table-scroll::-webkit-scrollbar {
+          width: 11px;
+          height: 11px;
+        }
+
+        .sales-table-scroll::-webkit-scrollbar-track {
+          background: rgba(5, 16, 48, 0.6);
+        }
+
+        .sales-table-scroll::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, rgba(46, 134, 245, 0.82), rgba(26, 79, 214, 0.88));
+          border-radius: 999px;
+          border: 2px solid rgba(5, 16, 48, 0.78);
+        }
+
+        .sales-table-scroll::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, rgba(96, 165, 250, 0.92), rgba(46, 134, 245, 0.92));
+        }
+
+        .sales-table-scroll::-webkit-scrollbar-corner {
+          background: rgba(5, 16, 48, 0.6);
         }
 
         .sales-table {
           width: 100%;
           min-width: 760px;
+          height: 100%;
           border-collapse: collapse;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .sales-table thead {
+          flex: 0 0 auto;
+          display: table;
+          width: 100%;
+          table-layout: fixed;
+        }
+
+        .sales-table tbody {
+          flex: 1;
+          min-height: 0;
+          display: block;
+          overflow-y: auto;
+          overflow-x: hidden;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(126, 184, 255, 0.45) rgba(8, 18, 40, 0.28);
+        }
+
+        .sales-table tbody::-webkit-scrollbar {
+          width: 11px;
+        }
+
+        .sales-table tbody::-webkit-scrollbar-track {
+          background: rgba(5, 16, 48, 0.6);
+        }
+
+        .sales-table tbody::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, rgba(46, 134, 245, 0.82), rgba(26, 79, 214, 0.88));
+          border-radius: 999px;
+          border: 2px solid rgba(5, 16, 48, 0.78);
+        }
+
+        .sales-table tbody::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, rgba(96, 165, 250, 0.92), rgba(46, 134, 245, 0.92));
+        }
+
+        .sales-table tbody tr {
+          display: table;
+          width: 100%;
+          table-layout: fixed;
         }
 
         .sales-table th,
@@ -145,12 +215,16 @@ export default function SalesList() {
         }
 
         .sales-table th {
+          position: relative;
+          z-index: 1;
           color: rgba(180, 210, 255, 0.35);
-          background: rgba(100, 160, 255, 0.03);
+          background: rgba(10, 24, 52, 0.96);
+          backdrop-filter: blur(12px);
           font-size: 10px;
           font-weight: 800;
           letter-spacing: 0.12em;
           text-transform: uppercase;
+          box-shadow: 0 1px 0 rgba(100, 160, 255, 0.1), 0 10px 18px rgba(2, 8, 24, 0.18);
         }
 
         .sales-table td {

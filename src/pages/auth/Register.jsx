@@ -7,7 +7,6 @@ function Register() {
   const canvasRef = useRef(null)
   const navigate = useNavigate()
 
-  // --- States for Form Data ---
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [username, setUsername] = useState('')
@@ -15,15 +14,14 @@ function Register() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  // Idagdag itong dalawa para sa visibility ng password
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
-  const [errorField, setErrorField] = useState('') // Importante ito para sa red border
+  const [errorField, setErrorField] = useState('')
 
-  const [isSuccess, setIsSuccess] = useState(false); // Para sa visibility ng success card
+  const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -67,17 +65,15 @@ function Register() {
     }
   }, [])
 
-  // --- Registration Logic ---
   const handleRegister = async (e) => {
   e.preventDefault()
   setLoading(true)
   setErrorMsg('')
   setErrorField('')
 
-  // Check kung magkapareho ang password
   if (password !== confirmPassword) {
     setErrorMsg("Passwords do not match!")
-    setErrorField('confirmPassword') // I-rered ang confirm password
+    setErrorField('confirmPassword')
     setLoading(false)
     return
   }
@@ -372,7 +368,6 @@ function Register() {
         <div className="absolute inset-0 z-0 pointer-events-none"
           style={{ background: 'radial-gradient(ellipse at 50% 60%, rgba(20, 60, 180, 0.12) 0%, transparent 70%)' }} />
 
-        {/* Card - Wrapped in FORM */}
         <form onSubmit={handleRegister} className="apple-card relative z-10 w-full mx-4 p-8" style={{ maxWidth: '380px' }}>
 
           <div className="text-center mb-7">
@@ -382,7 +377,6 @@ function Register() {
             </p>
           </div>
 
-          {/* First Name & Last Name */}
           <div className="input-wrap flex gap-3 mb-3">
             <div className="flex-1">
               <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
@@ -423,14 +417,12 @@ function Register() {
             />
           </div>
 
-          {/* Email */}
           <div className="input-wrap mb-3">
             <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
               style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Email</label>
             <input 
               type="email" 
               placeholder="Enter your email" 
-              // Dito papasok yung red border logic
               className={`glow-input ${errorField === 'email' ? 'error-glow' : ''}`} 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -438,7 +430,6 @@ function Register() {
             />
           </div>
 
-          {/* Password */}
           <div className="input-wrap mb-3">
             <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
               style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Password</label>
@@ -453,7 +444,7 @@ function Register() {
               />
               <button 
                 type="button" 
-                className="toggle-btn mb-1.5" // Sinunod natin yung class mo sa login
+                className="toggle-btn mb-1.5"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -461,7 +452,6 @@ function Register() {
             </div>
           </div>
 
-          {/* Confirm Password */}
           <div className="input-wrap mb-5">
             <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
               style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Confirm Password</label>
@@ -484,7 +474,6 @@ function Register() {
             </div>
           </div>
 
-          {/* Lalabas lang ito kapag may errorMsg na state */}
           {errorMsg && (
             <div className="mb-4 text-center">
               <p className="text-[11px] font-medium" style={{ color: '#ff9494' }}>
@@ -510,7 +499,6 @@ function Register() {
 
         </form>
 
-        {/* Success Notification */}
         {isSuccess && (
           <div className="success-notification">
             <div className="success-card">

@@ -1,8 +1,7 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../supabase/supabaseClient';
-import { useAuth } from './AuthContext';
-
-const UserRightsContext = createContext({});
+import { useAuth } from './useAuth';
+import { UserRightsContext } from './rightsContext';
 
 export const UserRightsProvider = ({ children }) => {
   const { user } = useAuth();
@@ -54,7 +53,7 @@ export const UserRightsProvider = ({ children }) => {
           });
           setRights(prev => ({ ...prev, ...rightsMap }));
         }
-      } catch (err) {
+      } catch {
         // Errors are caught silently for a cleaner production UI
       } finally {
         setRightsLoading(false);
@@ -70,5 +69,3 @@ export const UserRightsProvider = ({ children }) => {
     </UserRightsContext.Provider>
   );
 };
-
-export const useRights = () => useContext(UserRightsContext);
