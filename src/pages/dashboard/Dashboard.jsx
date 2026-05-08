@@ -11,11 +11,13 @@ import {
   Users,
 } from 'lucide-react'
 import { useAuth } from '../../context/useAuth'
+import { useRights } from '../../context/useRights'
 import { getProducts } from '../../services/salesProductApi'
 import { supabase } from '../../supabase/supabaseClient'
 
 function Dashboard() {
   const { user } = useAuth()
+  const { rights } = useRights()
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
   const [salesCount, setSalesCount] = useState(0)
@@ -55,12 +57,16 @@ function Dashboard() {
     const activeCustomers = customers.filter((customer) => normalizeStatus(customer.record_status) === 'ACTIVE').length
     const inactiveCustomers = customers.filter((customer) => normalizeStatus(customer.record_status) === 'INACTIVE').length
     const prices = products.map((product) => product.pricehist?.[0]?.unitprice || 0)
+    const pricedProducts = prices.filter(Boolean)
     const highestPrice = Math.max(0, ...prices)
+    const lowestPrice = pricedProducts.length ? Math.min(...pricedProducts) : 0
     const averagePrice = prices.length
       ? prices.reduce((total, price) => total + price, 0) / prices.length
       : 0
     const activeRate = customers.length ? Math.round((activeCustomers / customers.length) * 100) : 0
     const catalogueCoverage = products.length ? Math.round((prices.filter(Boolean).length / products.length) * 100) : 0
+    const missingPayterm = customers.filter((customer) => !customer.payterm).length
+    const unpricedProducts = products.length - pricedProducts.length
 
     return {
       totalCustomers: customers.length,
@@ -69,9 +75,12 @@ function Dashboard() {
       productCount: products.length,
       salesCount,
       highestPrice,
+      lowestPrice,
       averagePrice,
       activeRate,
       catalogueCoverage,
+      missingPayterm,
+      unpricedProducts,
     }
   }, [customers, products, salesCount])
 
@@ -196,6 +205,19 @@ function Dashboard() {
     { label: 'Active customer ratio', value: stats.activeRate, icon: UserCheck },
     { label: 'Priced product coverage', value: stats.catalogueCoverage, icon: Database },
     { label: 'Inactive recovery queue', value: stats.totalCustomers ? Math.round((stats.inactiveCustomers / stats.totalCustomers) * 100) : 0, icon: AlertCircle },
+  ]
+
+  const qualityRows = [
+    { label: 'Unpriced products', value: stats.unpricedProducts },
+    { label: 'Missing pay terms', value: stats.missingPayterm },
+    { label: 'Price spread', value: formatCurrency(Math.max(0, stats.highestPrice - stats.lowestPrice)) },
+  ]
+
+  const accessRows = [
+    { label: 'Add', value: rights.CUST_ADD === 1 ? 'Allowed' : 'Blocked' },
+    { label: 'Edit', value: rights.CUST_EDIT === 1 ? 'Allowed' : 'Blocked' },
+    { label: 'Delete', value: rights.CUST_DEL === 1 ? 'Allowed' : 'SUPERADMIN' },
+    { label: 'Admin', value: rights.ADM_USER === 1 ? 'Allowed' : 'Blocked' },
   ]
 
   return (
@@ -748,6 +770,43 @@ function Dashboard() {
           font-size: 16px;
           font-weight: 900;
           font-variant-numeric: tabular-nums;
+        }
+
+        .rule-stack {
+          display: grid;
+          gap: 5px;
+        }
+
+        .rule-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          min-height: 27px;
+          padding: 5px 7px;
+          border-radius: 9px;
+          border: 1px solid rgba(150, 190, 255, 0.08);
+          background: rgba(100, 160, 255, 0.04);
+        }
+
+        .rule-name {
+          color: rgba(203, 224, 255, 0.48);
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .rule-value {
+          color: rgba(248, 252, 255, 0.92);
+          font-size: 10.5px;
+          font-weight: 850;
+          text-align: right;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .rule-value.warn {
+          color: rgba(252, 211, 77, 0.95);
         }
 
         .insight-list {
@@ -1317,6 +1376,36 @@ function Dashboard() {
                     <div className="ops-item" key={item.label}>
                       <span className="ops-label">{item.label}</span>
                       <span className="ops-value">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="side-card glass-panel">
+                <div className="panel-title">
+                  <h2>Data Quality</h2>
+                  <span>audit</span>
+                </div>
+                <div className="rule-stack">
+                  {qualityRows.map((item) => (
+                    <div className="rule-row" key={item.label}>
+                      <span className="rule-name">{item.label}</span>
+                      <span className="rule-value">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="side-card glass-panel">
+                <div className="panel-title">
+                  <h2>Access Rules</h2>
+                  <span>current user</span>
+                </div>
+                <div className="rule-stack">
+                  {accessRows.map((item) => (
+                    <div className="rule-row" key={item.label}>
+                      <span className="rule-name">{item.label}</span>
+                      <span className={`rule-value ${item.value === 'SUPERADMIN' ? 'warn' : ''}`}>{item.value}</span>
                     </div>
                   ))}
                 </div>
