@@ -1,4 +1,5 @@
 import { AuthProvider } from "./context/AuthContext";
+import { UserRightsProvider } from "./context/UserRightsContext";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
@@ -29,6 +30,7 @@ function AdminRoute({ children }) {
 function App() {
   return (
     <AuthProvider>
+      <UserRightsProvider>
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
@@ -57,6 +59,7 @@ function App() {
           <Route path="*" element={<Navigate to="/customers" replace />} />
         </Route>
       </Routes>
+      </UserRightsProvider>
     </AuthProvider>
   );
 }

@@ -72,12 +72,12 @@ INSERT INTO product VALUES('PS0003','Cisco Virt Hardware', 'pc');
 
 -- 2. Create Customer (Parent)
 CREATE TABLE customer (
-    custno VARCHAR(5) NOT NULL PRIMARY KEY, 
-    custname VARCHAR(50), 
-    address VARCHAR(100),
-    payterm VARCHAR(3) CONSTRAINT pay_ck CHECK (payterm IN ('COD', '30D', '45D')), 
-    record_status VARCHAR(10) DEFAULT 'active', 
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    custno VARCHAR(5) NOT NULL PRIMARY KEY,
+    custname VARCHAR(20) NOT NULL,
+    address VARCHAR(50),
+    payterm VARCHAR(3) CONSTRAINT pay_ck CHECK (payterm IN ('COD', '30D', '45D')),
+    record_status VARCHAR(10) NOT NULL DEFAULT 'ACTIVE',
+    stamp VARCHAR(60)
 );
 
 -- Insert customer records
@@ -169,7 +169,7 @@ CREATE TABLE priceHist (
     effDate DATE NOT NULL, 
     prodCode VARCHAR(6) NOT NULL REFERENCES product(prodCode), 
     unitPrice DECIMAL(10,2) CONSTRAINT unitP_ck CHECK (unitPrice > 0),  
-    PRIMARY KEY (effDate, prodCode) -- Removed the extra comma that was here
+    PRIMARY KEY (effDate, prodCode)
 );
 
 --  Insert PRICEHIST rows 
@@ -255,9 +255,10 @@ INSERT INTO priceHist VALUES('2011-02-01','NB0005', 1184.72);
 
 -- 4. Create Sales (Child of Customer)
 CREATE TABLE sales (
-    transNo VARCHAR(8) NOT NULL PRIMARY KEY, 
-    salesDate DATE, 
-    custNo VARCHAR(5) REFERENCES customer(custno) -- Removed the comma and simplified
+    transNo VARCHAR(8) PRIMARY KEY,
+    salesDate DATE,
+    custNo VARCHAR(5) REFERENCES customer(custno),
+    empNo VARCHAR(5) REFERENCES employee(empno)
 );
 
 -- Insert rows sales

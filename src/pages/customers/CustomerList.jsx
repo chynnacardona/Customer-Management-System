@@ -5,16 +5,16 @@ import AddCustomerModal from '../../components/shared/AddCustomerModal'
 import EditCustomerModal from '../../components/shared/EditCustomerModal'
 import SoftDeleteConfirmDialog from '../../components/shared/SoftDeleteConfirmDialog'
 import { customerService } from '../../services/customerService'
-import { useAuth } from '../../context/useAuth'
+import { useRights } from '../../context/UserRightsContext'
 
 function CustomerListPage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
-  const userType = user?.user_type ?? 'USER'
+  const { rights, userType } = useRights()
+  const effectiveUserType = userType ?? 'USER'
   const canRecoverDeleted = userType === 'ADMIN' || userType === 'SUPERADMIN'
-  const canAddCustomer = userType === 'ADMIN' || userType === 'SUPERADMIN'
-  const canEditCustomer = userType === 'ADMIN' || userType === 'SUPERADMIN'
-  const canDeleteCustomer = userType === 'SUPERADMIN'
+  const canAddCustomer = rights.CUST_ADD === 1
+  const canEditCustomer = rights.CUST_EDIT === 1
+  const canDeleteCustomer = rights.CUST_DEL === 1
   
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -30,14 +30,14 @@ function CustomerListPage() {
     try {
       setLoading(true)
       setError('')
-      const data = await customerService.getCustomers(userType)
+      const data = await customerService.getCustomers(effectiveUserType)
       setCustomers(data || [])
     } catch (err) {
       setError(err.message || 'Database connection failed.')
     } finally {
       setLoading(false)
     }
-  }, [userType])
+  }, [effectiveUserType])
 
   useEffect(() => {
     fetchFromDB()
