@@ -76,7 +76,7 @@ CREATE TABLE customer (
     custname VARCHAR(20) NOT NULL, 
     address VARCHAR(50),
     payterm VARCHAR(3) CONSTRAINT pay_ck CHECK (payterm IN ('COD', '30D', '45D')), 
-    record_status VARCHAR(10) DEFAULT 'ACTIVE', 
+    record_status VARCHAR(10) NOT NULL DEFAULT 'INACTIVE', 
     stamp VARCHAR(60)
 );
 
