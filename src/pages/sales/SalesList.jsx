@@ -43,6 +43,10 @@ export default function SalesList() {
           from { opacity: 0; transform: translateY(16px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes salesCardIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
 
         .sales-page {
           animation: salesPageIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -98,10 +102,17 @@ export default function SalesList() {
           align-items: center;
           gap: 8px;
           min-width: 260px;
-          background: rgba(100, 160, 255, 0.04);
-          border: 1px solid rgba(100, 160, 255, 0.1);
+          background: rgba(126, 184, 255, 0.04);
+          border: 1px solid rgba(126, 184, 255, 0.12);
           border-radius: 10px;
           padding: 8px 12px;
+          transition: all 0.2s ease;
+        }
+
+        .sales-search:focus-within {
+          border-color: rgba(56, 189, 248, 0.34);
+          background: rgba(126, 184, 255, 0.07);
+          box-shadow: 0 0 0 3px rgba(46, 134, 245, 0.1);
         }
 
         .sales-search input {
@@ -119,9 +130,18 @@ export default function SalesList() {
           display: flex;
           flex-direction: column;
           border-radius: 16px;
-          border: 1px solid rgba(100, 160, 255, 0.1);
-          background: rgba(8, 18, 40, 0.62);
+          border: 1px solid rgba(126, 184, 255, 0.12);
+          background: linear-gradient(180deg, rgba(126, 184, 255, 0.035), transparent 44%), linear-gradient(145deg, rgba(8, 18, 40, 0.84), rgba(3, 9, 24, 0.9));
+          box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.045);
           overflow: hidden;
+          animation: salesCardIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+          transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+        }
+
+        .sales-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(126, 184, 255, 0.24);
+          box-shadow: 0 22px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255,255,255,0.07);
         }
 
         .sales-table-scroll {
@@ -218,7 +238,7 @@ export default function SalesList() {
           position: relative;
           z-index: 1;
           color: rgba(180, 210, 255, 0.35);
-          background: rgba(10, 24, 52, 0.96);
+          background: rgba(6, 16, 36, 0.96);
           backdrop-filter: blur(12px);
           font-size: 10px;
           font-weight: 800;
@@ -230,6 +250,15 @@ export default function SalesList() {
         .sales-table td {
           color: rgba(180, 210, 255, 0.68);
           font-size: 12.5px;
+        }
+
+        .sales-table tbody tr {
+          transition: background 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .sales-table tbody tr:hover {
+          background: rgba(126, 184, 255, 0.07);
+          box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.75);
         }
 
         .sales-code {

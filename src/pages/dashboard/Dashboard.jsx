@@ -7,6 +7,7 @@ import {
   Loader2,
   ShieldCheck,
   ShoppingCart,
+  Sparkles,
   UserCheck,
   Users,
 } from 'lucide-react'
@@ -14,6 +15,16 @@ import { useAuth } from '../../context/useAuth'
 import { useRights } from '../../context/useRights'
 import { getProducts } from '../../services/salesProductApi'
 import { supabase } from '../../supabase/supabaseClient'
+
+const currency = new Intl.NumberFormat('en-PH', {
+  style: 'currency',
+  currency: 'PHP',
+  maximumFractionDigits: 2,
+})
+
+function clamp(value, min = 0, max = 100) {
+  return Math.min(max, Math.max(min, value))
+}
 
 function Dashboard() {
   const { user } = useAuth()
@@ -56,161 +67,76 @@ function Dashboard() {
     const normalizeStatus = (value) => String(value || '').toUpperCase()
     const activeCustomers = customers.filter((customer) => normalizeStatus(customer.record_status) === 'ACTIVE').length
     const inactiveCustomers = customers.filter((customer) => normalizeStatus(customer.record_status) === 'INACTIVE').length
-    const prices = products.map((product) => product.pricehist?.[0]?.unitprice || 0)
-    const pricedProducts = prices.filter(Boolean)
+    const prices = products.map((product) => Number(product.pricehist?.[0]?.unitprice || 0))
+    const pricedProducts = prices.filter((price) => price > 0)
     const highestPrice = Math.max(0, ...prices)
     const lowestPrice = pricedProducts.length ? Math.min(...pricedProducts) : 0
-    const averagePrice = prices.length
-      ? prices.reduce((total, price) => total + price, 0) / prices.length
-      : 0
+    const averagePrice = prices.length ? prices.reduce((total, price) => total + price, 0) / prices.length : 0
     const activeRate = customers.length ? Math.round((activeCustomers / customers.length) * 100) : 0
-    const catalogueCoverage = products.length ? Math.round((prices.filter(Boolean).length / products.length) * 100) : 0
+    const catalogueCoverage = products.length ? Math.round((pricedProducts.length / products.length) * 100) : 0
     const missingPayterm = customers.filter((customer) => !customer.payterm).length
     const unpricedProducts = products.length - pricedProducts.length
+    const salesPerCustomer = customers.length ? salesCount / customers.length : 0
 
     return {
-      totalCustomers: customers.length,
       activeCustomers,
+      activeRate,
+      averagePrice,
+      catalogueCoverage,
+      highestPrice,
       inactiveCustomers,
+      lowestPrice,
+      missingPayterm,
+      pricedProducts: pricedProducts.length,
       productCount: products.length,
       salesCount,
-      highestPrice,
-      lowestPrice,
-      averagePrice,
-      activeRate,
-      catalogueCoverage,
-      missingPayterm,
+      salesPerCustomer,
+      totalCustomers: customers.length,
       unpricedProducts,
     }
   }, [customers, products, salesCount])
 
-  const dashboardCharts = useMemo(() => {
-    const paytermCounts = customers.reduce((counts, customer) => {
+  const payterms = useMemo(() => {
+    const counts = customers.reduce((acc, customer) => {
       const key = customer.payterm || 'N/A'
-      counts[key] = (counts[key] || 0) + 1
-      return counts
+      acc[key] = (acc[key] || 0) + 1
+      return acc
     }, {})
 
-    const paytermChart = ['COD', '30D', '45D', 'N/A'].map((label) => ({
-      label,
-      value: paytermCounts[label] || 0,
-      percent: customers.length ? Math.round(((paytermCounts[label] || 0) / customers.length) * 100) : 0,
-    })).filter((item) => item.value > 0 || item.label !== 'N/A')
-
-    const priceBands = [
-      { label: 'Budget', hint: 'Under PHP 100', value: 0 },
-      { label: 'Standard', hint: 'PHP 100-499', value: 0 },
-      { label: 'Premium', hint: 'PHP 500+', value: 0 },
-    ]
-
-    products.forEach((product) => {
-      const price = product.pricehist?.[0]?.unitprice || 0
-      if (price < 100) priceBands[0].value += 1
-      else if (price < 500) priceBands[1].value += 1
-      else priceBands[2].value += 1
-    })
-
-    const pricedProducts = products.filter((product) => product.pricehist?.[0]?.unitprice).length
-    const statusMix = [
-      { label: 'Active', value: stats.activeCustomers, percent: stats.activeRate, tone: 'good' },
-      {
-        label: 'Inactive',
-        value: stats.inactiveCustomers,
-        percent: stats.totalCustomers ? Math.round((stats.inactiveCustomers / stats.totalCustomers) * 100) : 0,
-        tone: 'warn',
-      },
-    ]
-
-    const ops = [
-      { label: 'Sales per customer', value: stats.totalCustomers ? (stats.salesCount / stats.totalCustomers).toFixed(1) : '0.0' },
-      { label: 'Priced products', value: `${pricedProducts}/${stats.productCount}` },
-      { label: 'Recovery queue', value: stats.inactiveCustomers },
-    ]
-
-    const insights = [
-      {
-        label: 'Customer base',
-        value: stats.totalCustomers ? `${stats.activeRate}% active` : 'No records',
-        detail: stats.inactiveCustomers ? `${stats.inactiveCustomers} queued for recovery` : 'No recovery backlog',
-      },
-      {
-        label: 'Catalogue readiness',
-        value: `${stats.catalogueCoverage}% priced`,
-        detail: `${pricedProducts} of ${stats.productCount} products have a current price`,
-      },
-      {
-        label: 'Sales footprint',
-        value: `${stats.salesCount} transactions`,
-        detail: stats.totalCustomers ? `${(stats.salesCount / stats.totalCustomers).toFixed(1)} sales per customer` : 'Waiting for customers',
-      },
-    ]
-
-    const maxOperationalValue = Math.max(stats.totalCustomers, stats.productCount, stats.salesCount, 1)
-    const operationalBars = [
-      { label: 'Customers', value: stats.totalCustomers, percent: Math.round((stats.totalCustomers / maxOperationalValue) * 100), tone: 'blue' },
-      { label: 'Sales', value: stats.salesCount, percent: Math.round((stats.salesCount / maxOperationalValue) * 100), tone: 'cyan' },
-      { label: 'Products', value: stats.productCount, percent: Math.round((stats.productCount / maxOperationalValue) * 100), tone: 'violet' },
-      { label: 'Inactive', value: stats.inactiveCustomers, percent: Math.round((stats.inactiveCustomers / maxOperationalValue) * 100), tone: 'red' },
-    ]
-
-    const moduleCoverage = [
-      { label: 'Customer Module', value: stats.totalCustomers, caption: 'managed records', icon: 'C' },
-      { label: 'Sales Module', value: stats.salesCount, caption: 'read-only transactions', icon: 'S' },
-      { label: 'Product Module', value: stats.productCount, caption: 'catalogue rows', icon: 'P' },
-      { label: 'Recovery Queue', value: stats.inactiveCustomers, caption: 'inactive customers', icon: 'R' },
-    ]
-
-    return { paytermChart, priceBands, statusMix, ops, insights, operationalBars, moduleCoverage }
-  }, [customers, products, stats])
-
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      maximumFractionDigits: 2,
-    }).format(value)
+    return ['COD', '30D', '45D']
+      .map((label) => ({
+        label,
+        value: counts[label] || 0,
+        percent: customers.length ? Math.round(((counts[label] || 0) / customers.length) * 100) : 0,
+      }))
+      .filter((item) => item.value > 0)
+  }, [customers])
 
   const statCards = [
-    {
-      label: 'Customers',
-      value: stats.totalCustomers,
-      detail: `${stats.activeCustomers} active`,
-      icon: Users,
-      tone: 'blue',
-    },
-    {
-      label: 'Products',
-      value: stats.productCount,
-      detail: 'catalogue items',
-      icon: Boxes,
-      tone: 'violet',
-    },
-    {
-      label: 'Sales',
-      value: stats.salesCount,
-      detail: 'transactions',
-      icon: ShoppingCart,
-      tone: 'cyan',
-    },
-    {
-      label: 'Avg. Price',
-      value: formatCurrency(stats.averagePrice),
-      detail: `high ${formatCurrency(stats.highestPrice)}`,
-      icon: CircleDollarSign,
-      tone: 'green',
-    },
+    { label: 'Customers', value: stats.totalCustomers, detail: `${stats.activeCustomers} active`, icon: Users, tone: 'blue' },
+    { label: 'Sales', value: stats.salesCount, detail: 'transactions', icon: ShoppingCart, tone: 'cyan' },
+    { label: 'Products', value: stats.productCount, detail: 'catalogue rows', icon: Boxes, tone: 'violet' },
+    { label: 'Avg. Price', value: currency.format(stats.averagePrice), detail: `high ${currency.format(stats.highestPrice)}`, icon: CircleDollarSign, tone: 'green' },
   ]
 
   const healthItems = [
     { label: 'Active customer ratio', value: stats.activeRate, icon: UserCheck },
-    { label: 'Priced product coverage', value: stats.catalogueCoverage, icon: Database },
-    { label: 'Inactive recovery queue', value: stats.totalCustomers ? Math.round((stats.inactiveCustomers / stats.totalCustomers) * 100) : 0, icon: AlertCircle },
+    { label: 'Priced catalogue', value: stats.catalogueCoverage, icon: Database },
+    {
+      label: 'Recovery pressure',
+      value: stats.totalCustomers ? Math.round((stats.inactiveCustomers / stats.totalCustomers) * 100) : 0,
+      icon: AlertCircle,
+    },
   ]
 
-  const qualityRows = [
-    { label: 'Unpriced products', value: stats.unpricedProducts },
-    { label: 'Missing pay terms', value: stats.missingPayterm },
-    { label: 'Price spread', value: formatCurrency(Math.max(0, stats.highestPrice - stats.lowestPrice)) },
+  const readinessScore = Math.round(
+    (stats.activeRate + stats.catalogueCoverage + (stats.missingPayterm === 0 ? 100 : 70) + (stats.unpricedProducts === 0 ? 100 : 70)) / 4
+  )
+
+  const signalRows = [
+    { label: 'Readiness', value: `${readinessScore}%`, hint: 'overall data health', width: readinessScore },
+    { label: 'Risk', value: stats.inactiveCustomers || stats.unpricedProducts || stats.missingPayterm ? 'Watch' : 'Clear', hint: 'quality flags', width: stats.inactiveCustomers || stats.unpricedProducts || stats.missingPayterm ? 62 : 100 },
+    { label: 'Access', value: rights.ADM_USER === 1 ? 'Privileged' : 'Standard', hint: 'current session', width: rights.ADM_USER === 1 ? 100 : 58 },
   ]
 
   const accessRows = [
@@ -220,992 +146,957 @@ function Dashboard() {
     { label: 'Admin', value: rights.ADM_USER === 1 ? 'Allowed' : 'Blocked' },
   ]
 
+  const accessScore = Math.round(
+    (['CUST_ADD', 'CUST_EDIT', 'CUST_DEL', 'ADM_USER'].filter((right) => rights[right] === 1).length / 4) * 100
+  )
+
+  const pulseScore = Math.round((readinessScore + stats.activeRate + stats.catalogueCoverage + clamp(stats.salesPerCustomer * 38)) / 4)
+
+  const pulseMetrics = [
+    { label: 'Customers', value: stats.activeRate, detail: `${stats.activeCustomers}/${stats.totalCustomers} active`, x: 50, y: 10, tone: 'cyan' },
+    { label: 'Sales Flow', value: clamp(stats.salesPerCustomer * 38), detail: `${stats.salesPerCustomer.toFixed(1)} per customer`, x: 84, y: 34, tone: 'blue' },
+    { label: 'Catalogue', value: stats.catalogueCoverage, detail: `${stats.pricedProducts}/${stats.productCount} priced`, x: 74, y: 78, tone: 'violet' },
+    { label: 'Data Health', value: clamp(100 - stats.unpricedProducts * 8 - stats.missingPayterm * 8), detail: `${stats.unpricedProducts + stats.missingPayterm} flags`, x: 26, y: 78, tone: 'green' },
+    { label: 'Access', value: accessScore, detail: rights.ADM_USER === 1 ? 'privileged' : 'standard', x: 16, y: 34, tone: 'gold' },
+  ]
+
   return (
     <>
       <style>{`
         @keyframes dashboardIn {
-          from { opacity: 0; transform: translateY(16px); }
+          from { opacity: 0; transform: translateY(14px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes cardIn {
+        @keyframes cardFloatIn {
           from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
+        @keyframes pulseGlow {
+          0%, 100% { filter: brightness(1); }
+          50% { filter: brightness(1.18); }
+        }
+
         .dashboard-page {
+          --dash-bg-a: rgba(8, 18, 40, 0.84);
+          --dash-bg-b: rgba(3, 9, 24, 0.9);
+          --dash-border: rgba(126, 184, 255, 0.12);
+          --dash-border-hot: rgba(126, 184, 255, 0.24);
+          --dash-cyan: #38bdf8;
+          --dash-blue: #2e86f5;
+          --dash-green: #34d399;
+          width: 100%;
+          max-width: 1540px;
           height: calc(100vh - 48px);
-          min-height: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
+          min-height: 720px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 330px;
+          grid-template-rows: 104px 108px minmax(0, 1fr) 118px;
+          gap: 12px;
           overflow: hidden;
           animation: dashboardIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
 
-        .dashboard-shell {
-          flex: 1;
-          min-height: 0;
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 284px;
-          gap: 8px;
-          align-items: stretch;
-        }
-
-        .dashboard-main,
-        .dashboard-side {
-          min-height: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .glass-panel {
-          border: 1px solid rgba(150, 190, 255, 0.14);
-          background: linear-gradient(145deg, rgba(12, 24, 44, 0.72), rgba(9, 18, 34, 0.52));
-          box-shadow: 0 20px 44px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-          backdrop-filter: blur(22px) saturate(135%);
-          -webkit-backdrop-filter: blur(22px) saturate(135%);
-          border-radius: 18px;
-          overflow: hidden;
-          animation: cardIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-        }
-
-        .glass-panel:hover,
-        .stat-card:hover,
-        .price-band:hover,
-        .ops-item:hover,
-        .insight-item:hover,
-        .status-pill:hover {
-          transform: translateY(-1px);
-          border-color: rgba(126, 184, 255, 0.22);
-          box-shadow: 0 18px 38px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-        }
-
-        .dashboard-hero {
-          min-height: 108px;
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) 150px;
-          gap: 10px;
-          padding: 10px;
-        }
-
-        .hero-copy {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
+        .dash-card {
+          position: relative;
           min-width: 0;
+          min-height: 0;
+          border: 1px solid var(--dash-border);
+          background:
+            linear-gradient(180deg, rgba(126, 184, 255, 0.035), transparent 48%),
+            linear-gradient(145deg, var(--dash-bg-a), var(--dash-bg-b));
+          border-radius: 18px;
+          box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.045);
+          overflow: hidden;
+          animation: cardFloatIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+          transition:
+            transform 0.22s ease,
+            border-color 0.22s ease,
+            box-shadow 0.22s ease,
+            background 0.22s ease;
         }
 
-        .hero-kicker {
+        .dash-card::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          pointer-events: none;
+          background:
+            linear-gradient(90deg, rgba(56, 189, 248, 0.18), transparent 18%, transparent 82%, rgba(52, 211, 153, 0.1)),
+            linear-gradient(180deg, rgba(255,255,255,0.05), transparent 34%);
+          opacity: 0.45;
+          transition: opacity 0.22s ease;
+        }
+
+        .dash-card:hover {
+          transform: translateY(-2px);
+          border-color: var(--dash-border-hot);
+          box-shadow:
+            0 22px 48px rgba(0, 0, 0, 0.34),
+            0 0 0 1px rgba(56, 189, 248, 0.05),
+            inset 0 1px 0 rgba(255,255,255,0.07);
+        }
+
+        .dash-card:hover::after {
+          opacity: 0.85;
+        }
+
+        .stat-card:nth-child(1) { animation-delay: 0.04s; }
+        .stat-card:nth-child(2) { animation-delay: 0.08s; }
+        .stat-card:nth-child(3) { animation-delay: 0.12s; }
+        .stat-card:nth-child(4) { animation-delay: 0.16s; }
+        .matrix-card { animation-delay: 0.18s; }
+        .side-card:nth-child(1) { animation-delay: 0.2s; }
+        .side-card:nth-child(2) { animation-delay: 0.24s; }
+        .side-card:nth-child(3) { animation-delay: 0.28s; }
+        .bottom-card:nth-child(1) { animation-delay: 0.26s; }
+        .bottom-card:nth-child(2) { animation-delay: 0.3s; }
+
+        .stat-card:hover .stat-icon,
+        .access-card:hover .access-icon {
+          transform: translateY(-1px) scale(1.04);
+        }
+
+        .dash-hero {
+          grid-column: 1 / 2;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          padding: 18px 20px;
+        }
+
+        .dash-kicker {
           display: inline-flex;
           align-items: center;
-          width: fit-content;
           gap: 7px;
-          padding: 5px 8px;
+          width: fit-content;
+          min-height: 28px;
+          padding: 0 11px;
           border-radius: 999px;
-          border: 1px solid rgba(110, 231, 183, 0.18);
-          background: rgba(16, 185, 129, 0.1);
-          color: rgba(167, 243, 208, 0.92);
-          font-size: 9.5px;
-          font-weight: 800;
+          color: rgba(191, 219, 254, 0.96);
+          background: rgba(46, 134, 245, 0.16);
+          border: 1px solid rgba(126, 184, 255, 0.22);
+          box-shadow: 0 0 18px rgba(46, 134, 245, 0.16);
+          font-size: 10px;
+          font-weight: 850;
           letter-spacing: 0.08em;
           text-transform: uppercase;
         }
 
-        .hero-title {
-          margin: 8px 0 4px;
-          color: rgba(246, 250, 255, 0.98);
-          font-size: 21px;
-          line-height: 1.05;
-          font-weight: 850;
+        .dash-title {
+          margin: 10px 0 4px;
+          color: white;
+          font-size: 24px;
+          line-height: 1;
+          font-weight: 900;
+          letter-spacing: 0;
         }
 
-        .hero-subtitle {
-          max-width: 560px;
+        .dash-copy {
           margin: 0;
-          color: rgba(203, 224, 255, 0.5);
-          font-size: 11px;
+          color: rgba(220, 225, 255, 0.52);
+          font-size: 12.5px;
           line-height: 1.35;
         }
 
-        .hero-meta {
+        .access-card {
+          grid-column: 2 / 3;
+          grid-row: 1 / 2;
           display: flex;
-          flex-wrap: wrap;
-          gap: 6px;
-          margin-top: 8px;
+          align-items: center;
+          gap: 12px;
+          padding: 16px;
+          background:
+            radial-gradient(circle at 90% 20%, rgba(56, 189, 248, 0.18), transparent 42%),
+            linear-gradient(180deg, rgba(126, 184, 255, 0.035), transparent 48%),
+            linear-gradient(145deg, rgba(8, 18, 40, 0.88), rgba(3, 9, 24, 0.92));
         }
 
-        .hero-chip {
+        .access-icon {
+          width: 42px;
+          height: 42px;
           display: inline-flex;
           align-items: center;
-          gap: 7px;
-          min-height: 25px;
-          padding: 0 8px;
-          border-radius: 10px;
-          border: 1px solid rgba(150, 190, 255, 0.13);
-          background: rgba(4, 12, 26, 0.32);
-          color: rgba(211, 230, 255, 0.72);
-          font-size: 10.5px;
-          font-weight: 700;
+          justify-content: center;
+          border-radius: 15px;
+          color: rgba(126, 184, 255, 0.98);
+          background: rgba(46, 134, 245, 0.14);
+          border: 1px solid rgba(126, 184, 255, 0.2);
+          transition: transform 0.22s ease, box-shadow 0.22s ease;
+          flex-shrink: 0;
         }
 
-        .hero-orbit {
-          position: relative;
-          min-height: 88px;
-          border-radius: 14px;
-          border: 1px solid rgba(150, 190, 255, 0.13);
-          background:
-            linear-gradient(160deg, rgba(28, 49, 76, 0.78), rgba(10, 21, 37, 0.58)),
-            repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 32px);
-          overflow: hidden;
-        }
-
-        .hero-meter {
-          position: absolute;
-          inset: 11px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-        }
-
-        .meter-label {
-          color: rgba(203, 224, 255, 0.52);
+        .label {
+          display: block;
+          color: rgba(220, 225, 255, 0.42);
           font-size: 10px;
-          font-weight: 800;
+          font-weight: 850;
           letter-spacing: 0.12em;
           text-transform: uppercase;
         }
 
-        .meter-value {
+        .access-value {
+          display: block;
+          margin-top: 4px;
           color: white;
-          font-size: 28px;
-          line-height: 1;
-          font-weight: 850;
-          font-variant-numeric: tabular-nums;
+          font-size: 17px;
+          font-weight: 900;
         }
 
-        .meter-track {
-          height: 7px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.1);
-          overflow: hidden;
-        }
-
-        .meter-fill {
-          height: 100%;
-          border-radius: inherit;
-          background: linear-gradient(90deg, #38bdf8, #34d399);
-        }
-
-        .stats-grid {
+        .stat-grid {
+          grid-column: 1 / 3;
           display: grid;
-          grid-template-columns: 1.15fr 1fr 1fr 1.25fr;
-          gap: 7px;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 12px;
         }
 
         .stat-card {
-          min-height: 66px;
-          padding: 8px;
-          border-radius: 13px;
-          border: 1px solid rgba(150, 190, 255, 0.12);
-          background: rgba(8, 18, 34, 0.58);
-          backdrop-filter: blur(16px);
-          box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
-          animation: cardIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-        }
-
-        .stat-card:nth-child(1) { animation-delay: 0.02s; }
-        .stat-card:nth-child(2) { animation-delay: 0.06s; }
-        .stat-card:nth-child(3) { animation-delay: 0.1s; }
-        .stat-card:nth-child(4) { animation-delay: 0.14s; }
-
-        .stat-card:hover {
-          background: rgba(12, 28, 52, 0.7);
+          padding: 15px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
         }
 
         .stat-top {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 10px;
+          gap: 12px;
         }
 
-        .stat-label {
-          color: rgba(203, 224, 255, 0.42);
-          font-size: 10px;
+        .stat-icon {
+          width: 32px;
+          height: 32px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 13px;
+          color: rgba(126, 184, 255, 0.98);
+          background: rgba(46, 134, 245, 0.13);
+          border: 1px solid rgba(126, 184, 255, 0.16);
+          transition: transform 0.22s ease, box-shadow 0.22s ease;
+          flex-shrink: 0;
+        }
+
+        .stat-card.cyan .stat-icon { color: rgba(103, 232, 249, 0.95); background: rgba(6, 182, 212, 0.12); border-color: rgba(103, 232, 249, 0.16); }
+        .stat-card.green .stat-icon { color: rgba(134, 239, 172, 0.95); background: rgba(34, 197, 94, 0.12); border-color: rgba(134, 239, 172, 0.16); }
+        .stat-card.violet .stat-icon { color: rgba(196, 181, 253, 0.95); background: rgba(139, 92, 246, 0.13); border-color: rgba(196, 181, 253, 0.16); }
+
+        .stat-value {
+          color: white;
+          font-size: 25px;
+          font-weight: 900;
+          line-height: 1;
+          white-space: nowrap;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .stat-detail {
+          margin-top: 5px;
+          color: rgba(220, 225, 255, 0.46);
+          font-size: 11.5px;
+        }
+
+        .matrix-card {
+          grid-column: 1 / 2;
+          grid-row: 3 / 4;
+          padding: 16px;
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr) auto;
+          gap: 14px;
+          position: relative;
+          background:
+            radial-gradient(circle at 48% 46%, rgba(103, 232, 249, 0.12), transparent 30%),
+            radial-gradient(circle at 78% 18%, rgba(46, 134, 245, 0.14), transparent 34%),
+            linear-gradient(180deg, rgba(126, 184, 255, 0.035), transparent 48%),
+            linear-gradient(145deg, rgba(8, 18, 40, 0.88), rgba(3, 9, 24, 0.92));
+        }
+
+        .card-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .card-title {
+          margin: 0;
+          color: white;
+          font-size: 15px;
+          font-weight: 900;
+        }
+
+        .card-hint {
+          color: rgba(220, 225, 255, 0.38);
+          font-size: 10.5px;
+          font-weight: 750;
+        }
+
+        .pulse-shell {
+          min-height: 0;
+          display: grid;
+          grid-template-columns: minmax(300px, 0.92fr) minmax(260px, 1fr);
+          align-items: center;
+          gap: 18px;
+        }
+
+        .pulse-orbit {
+          position: relative;
+          min-height: 285px;
+          height: 100%;
+          border-radius: 20px;
+          overflow: hidden;
+          background:
+            radial-gradient(circle at 50% 50%, rgba(12, 18, 35, 0.16) 0 28%, transparent 29%),
+            linear-gradient(145deg, rgba(126, 184, 255, 0.045), rgba(255, 255, 255, 0.015));
+          border: 1px solid rgba(126, 184, 255, 0.09);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+        }
+
+        .pulse-orbit::before,
+        .pulse-orbit::after {
+          content: '';
+          position: absolute;
+          inset: 28px;
+          border-radius: 50%;
+          border: 1px solid rgba(103, 232, 249, 0.14);
+          box-shadow: 0 0 28px rgba(103, 232, 249, 0.08);
+        }
+
+        .pulse-orbit::after {
+          inset: 66px;
+          border-color: rgba(196, 181, 253, 0.16);
+          box-shadow: 0 0 32px rgba(167, 139, 250, 0.1);
+        }
+
+        .pulse-core {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 142px;
+          height: 142px;
+          transform: translate(-50%, -50%);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background:
+            radial-gradient(circle at 50% 22%, rgba(255, 255, 255, 0.16), transparent 24%),
+            conic-gradient(from 210deg, rgba(103, 232, 249, 0.92), rgba(167, 139, 250, 0.96), rgba(52, 211, 153, 0.78), rgba(103, 232, 249, 0.92));
+          box-shadow:
+            0 0 48px rgba(103, 232, 249, 0.18),
+            0 0 70px rgba(167, 139, 250, 0.12);
+        }
+
+        .pulse-core::after {
+          content: '';
+          position: absolute;
+          inset: 8px;
+          border-radius: 50%;
+          background: linear-gradient(145deg, rgba(10, 17, 34, 0.96), rgba(18, 18, 32, 0.96));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+
+        .pulse-score,
+        .pulse-score-label {
+          position: relative;
+          z-index: 1;
+        }
+
+        .pulse-score {
+          color: white;
+          font-size: 38px;
+          line-height: 1;
+          font-weight: 950;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .pulse-score-label {
+          margin-top: 6px;
+          color: rgba(220, 225, 255, 0.5);
+          font-size: 9.5px;
           font-weight: 850;
           letter-spacing: 0.12em;
           text-transform: uppercase;
         }
 
-        .stat-icon {
-          width: 27px;
-          height: 27px;
+        .pulse-node {
+          position: absolute;
+          left: var(--x);
+          top: var(--y);
+          width: 44px;
+          height: 44px;
+          transform: translate(-50%, -50%);
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border-radius: 11px;
-          border: 1px solid rgba(125, 211, 252, 0.16);
-          background: rgba(14, 165, 233, 0.1);
-          color: rgba(125, 211, 252, 0.95);
-          flex-shrink: 0;
+          border-radius: 15px;
+          background: rgba(8, 14, 30, 0.86);
+          border: 1px solid rgba(126, 184, 255, 0.12);
+          box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26), 0 0 26px var(--glow);
+          animation: pulseGlow 2.9s ease-in-out infinite;
         }
 
-        .stat-value {
-          margin-top: 5px;
-          color: rgba(248, 252, 255, 0.98);
-          font-size: 17px;
-          line-height: 1;
-          font-weight: 850;
-          font-variant-numeric: tabular-nums;
-          white-space: nowrap;
-        }
-
-        .stat-detail {
-          margin-top: 3px;
-          color: rgba(203, 224, 255, 0.48);
-          font-size: 10.5px;
-        }
-
-        .stat-card.violet .stat-icon { color: rgba(196, 181, 253, 0.95); background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.18); }
-        .stat-card.cyan .stat-icon { color: rgba(103, 232, 249, 0.95); background: rgba(6, 182, 212, 0.1); border-color: rgba(6, 182, 212, 0.18); }
-        .stat-card.green .stat-icon { color: rgba(134, 239, 172, 0.95); background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.18); }
-
-        .health-panel {
-          padding: 9px 10px;
-        }
-
-        .panel-title {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 12px;
-          margin-bottom: 7px;
-        }
-
-        .panel-title h2 {
-          margin: 0;
-          color: rgba(246, 250, 255, 0.94);
-          font-size: 12.5px;
-          font-weight: 850;
-        }
-
-        .panel-title span {
-          color: rgba(203, 224, 255, 0.36);
-          font-size: 10px;
-          font-weight: 700;
-        }
-
-        .health-list {
-          display: grid;
-          gap: 5px;
-        }
-
-        .health-row {
-          display: grid;
-          grid-template-columns: 24px minmax(0, 1fr) 38px;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .health-icon {
-          width: 24px;
-          height: 24px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 10px;
-          background: rgba(96, 165, 250, 0.1);
-          color: rgba(147, 197, 253, 0.9);
-        }
-
-        .health-name {
-          display: block;
-          color: rgba(225, 239, 255, 0.82);
-          font-size: 10.8px;
-          font-weight: 750;
-        }
-
-        .health-track {
-          height: 5px;
-          margin-top: 4px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.08);
-          overflow: hidden;
-        }
-
-        .health-fill {
-          height: 100%;
-          border-radius: inherit;
-          background: linear-gradient(90deg, #60a5fa, #34d399);
-        }
-
-        .health-value {
-          color: rgba(235, 245, 255, 0.9);
-          font-size: 12px;
-          font-weight: 850;
-          text-align: right;
-          font-variant-numeric: tabular-nums;
-        }
-
-        .side-card {
-          padding: 9px 10px;
-        }
-
-        .main-lower-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
-          gap: 8px;
-          align-items: stretch;
-        }
-
-        .analytics-grid {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-          gap: 8px;
-        }
-
-        .analytics-panel {
-          padding: 8px 10px;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .chart-stack {
-          display: grid;
-          gap: 5px;
-        }
-
-        .bar-row {
-          display: grid;
-          grid-template-columns: 48px minmax(0, 1fr) 38px;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .bar-label {
-          color: rgba(225, 239, 255, 0.78);
-          font-size: 10.5px;
-          font-weight: 800;
-        }
-
-        .bar-track {
-          height: 6px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.08);
-          overflow: hidden;
-        }
-
-        .bar-fill {
-          min-width: 4px;
-          height: 100%;
-          border-radius: inherit;
-          background: linear-gradient(90deg, #60a5fa, #22d3ee);
-        }
-
-        .bar-value {
-          color: rgba(235, 245, 255, 0.9);
-          font-size: 10.5px;
-          font-weight: 850;
-          text-align: right;
-          font-variant-numeric: tabular-nums;
-        }
-
-        .donut-panel {
-          display: grid;
-          grid-template-columns: 70px minmax(0, 1fr);
-          align-items: center;
-          gap: 9px;
-        }
-
-        .donut {
-          width: 70px;
-          aspect-ratio: 1;
+        .pulse-node::before {
+          content: '';
+          width: calc(10px + (var(--value) * 0.16px));
+          height: calc(10px + (var(--value) * 0.16px));
+          max-width: 26px;
+          max-height: 26px;
           border-radius: 50%;
+          background: var(--tone);
+          box-shadow: 0 0 18px var(--glow);
+        }
+
+        .pulse-bars {
           display: grid;
-          place-items: center;
-          background:
-            radial-gradient(circle at center, rgba(8, 18, 34, 0.95) 0 54%, transparent 55%),
-            conic-gradient(#34d399 0 calc(var(--active) * 1%), #f87171 0 100%);
-          border: 1px solid rgba(150, 190, 255, 0.12);
-          box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.28);
+          gap: 10px;
+          align-content: center;
         }
 
-        .donut strong {
-          color: white;
-          font-size: 15px;
-          line-height: 1;
-          font-weight: 900;
-        }
-
-        .donut span {
-          display: block;
-          margin-top: 4px;
-          color: rgba(203, 224, 255, 0.42);
-          font-size: 8.5px;
-          font-weight: 800;
-          text-align: center;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-        }
-
-        .status-list {
+        .pulse-bar {
           display: grid;
-          gap: 5px;
-        }
-
-        .status-pill {
-          display: flex;
-          justify-content: space-between;
+          grid-template-columns: 86px minmax(0, 1fr) 40px;
           align-items: center;
           gap: 10px;
-          padding: 6px 8px;
-          border-radius: 10px;
-          background: rgba(100, 160, 255, 0.05);
-          border: 1px solid rgba(150, 190, 255, 0.09);
+          min-height: 42px;
+          padding: 8px 10px;
+          border-radius: 13px;
+          background: rgba(126, 184, 255, 0.045);
+          border: 1px solid rgba(126, 184, 255, 0.08);
+          transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
         }
 
-        .status-pill.good .status-dot { background: #34d399; }
-        .status-pill.warn .status-dot { background: #f87171; }
+        .pulse-bar:hover,
+        .health-row:hover,
+        .signal-row:hover,
+        .access-row:hover,
+        .op-card:hover {
+          transform: translateX(2px);
+          border-color: rgba(126, 184, 255, 0.18);
+          background: rgba(126, 184, 255, 0.07);
+        }
 
-        .status-left {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
+        .pulse-name {
           min-width: 0;
-        }
-
-        .status-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 999px;
-          box-shadow: 0 0 12px currentColor;
-          flex-shrink: 0;
-        }
-
-        .status-name {
-          color: rgba(225, 239, 255, 0.8);
-          font-size: 10.5px;
-          font-weight: 800;
-        }
-
-        .status-number {
-          color: rgba(248, 252, 255, 0.94);
-          font-size: 11px;
-          font-weight: 900;
-          font-variant-numeric: tabular-nums;
-        }
-
-        .price-band-grid {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 6px;
-          align-items: stretch;
-        }
-
-        .price-band {
-          min-height: 58px;
-          border-radius: 11px;
-          border: 1px solid rgba(150, 190, 255, 0.1);
-          background: linear-gradient(180deg, rgba(96, 165, 250, 0.11), rgba(8, 18, 34, 0.35));
-          padding: 8px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-        }
-
-        .price-band-label {
-          color: rgba(225, 239, 255, 0.86);
-          font-size: 10.8px;
+          color: rgba(235, 240, 255, 0.84);
+          font-size: 11.5px;
           font-weight: 850;
-        }
-
-        .price-band-hint {
-          display: block;
-          margin-top: 3px;
-          color: rgba(203, 224, 255, 0.36);
-          font-size: 9px;
-          line-height: 1.2;
-        }
-
-        .price-band-value {
-          color: white;
-          font-size: 17px;
-          font-weight: 900;
-          line-height: 1;
-          font-variant-numeric: tabular-nums;
-        }
-
-        .ops-card {
-          display: grid;
-          gap: 6px;
-          align-content: stretch;
-        }
-
-        .ops-item {
-          border-radius: 10px;
-          border: 1px solid rgba(150, 190, 255, 0.09);
-          background: rgba(100, 160, 255, 0.045);
-          padding: 8px;
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-        }
-
-        .ops-label {
-          display: block;
-          color: rgba(203, 224, 255, 0.38);
-          font-size: 9px;
-          font-weight: 850;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-        }
-
-        .ops-value {
-          display: block;
-          margin-top: 4px;
-          color: rgba(248, 252, 255, 0.95);
-          font-size: 16px;
-          font-weight: 900;
-          font-variant-numeric: tabular-nums;
-        }
-
-        .rule-stack {
-          display: grid;
-          gap: 5px;
-        }
-
-        .rule-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-          min-height: 27px;
-          padding: 5px 7px;
-          border-radius: 9px;
-          border: 1px solid rgba(150, 190, 255, 0.08);
-          background: rgba(100, 160, 255, 0.04);
-        }
-
-        .rule-name {
-          color: rgba(203, 224, 255, 0.48);
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-        }
-
-        .rule-value {
-          color: rgba(248, 252, 255, 0.92);
-          font-size: 10.5px;
-          font-weight: 850;
-          text-align: right;
-          font-variant-numeric: tabular-nums;
-        }
-
-        .rule-value.warn {
-          color: rgba(252, 211, 77, 0.95);
-        }
-
-        .insight-list {
-          display: grid;
-          gap: 8px;
-        }
-
-        .main-insights {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 8px;
-        }
-
-        .main-insights .insight-item {
-          min-height: 58px;
-        }
-
-        .graph-panel {
-          padding: 9px 10px;
-          min-height: 132px;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .column-chart {
-          flex: 1;
-          min-height: 78px;
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          align-items: end;
-          gap: 9px;
-          padding: 4px 4px 0;
-        }
-
-        .chart-column {
-          min-width: 0;
-          display: grid;
-          grid-template-rows: 1fr auto auto;
-          align-items: end;
-          gap: 4px;
-          height: 100%;
-        }
-
-        .column-track {
-          height: 72px;
-          display: flex;
-          align-items: flex-end;
-          border-radius: 14px;
-          background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.025));
-          border: 1px solid rgba(150, 190, 255, 0.08);
-          overflow: hidden;
-        }
-
-        .column-fill {
-          width: 100%;
-          min-height: 8px;
-          border-radius: 13px 13px 0 0;
-          background: linear-gradient(180deg, #60a5fa, #2563eb);
-          box-shadow: 0 -10px 22px rgba(96, 165, 250, 0.16);
-          transition: height 0.28s ease, filter 0.18s ease;
-        }
-
-        .chart-column:hover .column-fill {
-          filter: brightness(1.18);
-        }
-
-        .chart-column.cyan .column-fill { background: linear-gradient(180deg, #67e8f9, #0891b2); }
-        .chart-column.violet .column-fill { background: linear-gradient(180deg, #c4b5fd, #7c3aed); }
-        .chart-column.red .column-fill { background: linear-gradient(180deg, #fca5a5, #dc2626); }
-
-        .column-value {
-          color: rgba(248, 252, 255, 0.95);
-          font-size: 12px;
-          font-weight: 900;
-          text-align: center;
-          font-variant-numeric: tabular-nums;
-        }
-
-        .column-label {
-          color: rgba(203, 224, 255, 0.42);
-          font-size: 9px;
-          font-weight: 850;
-          text-align: center;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
 
-        .coverage-panel {
-          padding: 9px 10px;
-          display: flex;
-          flex-direction: column;
-          min-height: 132px;
+        .pulse-detail {
+          display: block;
+          margin-top: 3px;
+          color: rgba(220, 225, 255, 0.38);
+          font-size: 9.5px;
+          font-weight: 750;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        .coverage-grid {
-          flex: 1;
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 6px;
+        .pulse-track {
+          height: 8px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.08);
+          overflow: hidden;
         }
 
-        .coverage-card {
-          border-radius: 11px;
-          border: 1px solid rgba(150, 190, 255, 0.09);
-          background: rgba(100, 160, 255, 0.045);
-          padding: 8px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          min-height: 54px;
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        .pulse-fill {
+          height: 100%;
+          width: var(--value);
+          border-radius: inherit;
+          background: linear-gradient(90deg, var(--tone), rgba(255, 255, 255, 0.78));
+          box-shadow: 0 0 16px var(--glow);
         }
 
-        .coverage-card:hover {
-          transform: translateY(-2px);
-          border-color: rgba(126, 184, 255, 0.22);
-          background: rgba(100, 160, 255, 0.075);
-        }
-
-        .coverage-top {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .coverage-icon {
-          width: 22px;
-          height: 22px;
-          border-radius: 9px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(96, 165, 250, 0.12);
-          color: rgba(191, 219, 254, 0.96);
-          font-size: 10px;
-          font-weight: 900;
-          flex-shrink: 0;
-        }
-
-        .coverage-label {
-          min-width: 0;
-          color: rgba(225, 239, 255, 0.82);
-          font-size: 10px;
-          font-weight: 850;
-          line-height: 1.15;
-        }
-
-        .coverage-value {
-          margin-top: 4px;
+        .pulse-value {
           color: white;
-          font-size: 16px;
-          font-weight: 900;
-          line-height: 1;
+          font-size: 12px;
+          font-weight: 950;
+          text-align: right;
           font-variant-numeric: tabular-nums;
         }
 
-        .coverage-caption {
-          margin-top: 2px;
-          color: rgba(203, 224, 255, 0.38);
-          font-size: 9px;
-          line-height: 1.15;
-        }
-
-        .insight-item {
-          padding: 8px;
-          border-radius: 11px;
-          border: 1px solid rgba(150, 190, 255, 0.09);
-          background: linear-gradient(135deg, rgba(96, 165, 250, 0.08), rgba(52, 211, 153, 0.04));
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-        }
-
-        .insight-label {
-          display: block;
-          color: rgba(203, 224, 255, 0.38);
-          font-size: 9px;
-          font-weight: 850;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-        }
-
-        .insight-value {
-          display: block;
-          margin-top: 4px;
-          color: rgba(248, 252, 255, 0.96);
-          font-size: 12px;
-          font-weight: 900;
-        }
-
-        .insight-detail {
-          display: block;
-          margin-top: 2px;
-          color: rgba(203, 224, 255, 0.45);
-          font-size: 9.5px;
-          line-height: 1.2;
-        }
-
-        .role-card {
-          display: flex;
-          align-items: center;
-          gap: 9px;
-        }
-
-        .role-icon {
-          width: 30px;
-          height: 30px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 14px;
-          background: rgba(34, 197, 94, 0.11);
-          color: rgba(134, 239, 172, 0.95);
-          border: 1px solid rgba(34, 197, 94, 0.18);
-          flex-shrink: 0;
-        }
-
-        .role-label {
-          display: block;
-          color: rgba(203, 224, 255, 0.38);
-          font-size: 9px;
-          font-weight: 850;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-        }
-
-        .role-value {
-          display: block;
-          margin-top: 2px;
-          color: rgba(248, 252, 255, 0.95);
-          font-size: 12px;
-          font-weight: 850;
-        }
-
-        .mini-stack {
-          display: grid;
-          gap: 3px;
-        }
-
-        .mini-row {
+        .pulse-footer {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          gap: 10px;
-          padding: 5px 0;
-          border-bottom: 1px solid rgba(150, 190, 255, 0.08);
-        }
-
-        .mini-row:last-child {
-          border-bottom: none;
-        }
-
-        .mini-label {
-          color: rgba(203, 224, 255, 0.46);
+          gap: 12px;
+          color: rgba(220, 225, 255, 0.46);
           font-size: 10.5px;
+          font-weight: 800;
+        }
+
+        .pulse-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          min-height: 26px;
+          padding: 0 10px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.045);
+          border: 1px solid rgba(126, 184, 255, 0.09);
+          white-space: nowrap;
+        }
+
+        .pulse-chip::before {
+          content: '';
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #67e8f9;
+          box-shadow: 0 0 12px rgba(103, 232, 249, 0.8);
+        }
+
+        .matrix-legend {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .legend-item {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          color: rgba(220, 225, 255, 0.58);
+          font-size: 11px;
           font-weight: 700;
         }
 
-        .mini-value {
-          color: rgba(248, 252, 255, 0.92);
-          font-size: 11.5px;
+        .legend-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: rgba(168, 85, 247, 0.45);
+        }
+
+        .legend-dot.hot { background: #a78bfa; }
+        .legend-dot.best { background: #c4b5fd; }
+
+        .matrix {
+          min-height: 0;
+          display: grid;
+          grid-template-columns: 44px repeat(12, minmax(18px, 1fr));
+          gap: 7px;
+          align-content: center;
+        }
+
+        .matrix-label {
+          display: flex;
+          align-items: center;
+          color: rgba(220, 225, 255, 0.7);
+          font-size: 10.5px;
           font-weight: 850;
+          letter-spacing: 0.08em;
+        }
+
+        .matrix-cell {
+          aspect-ratio: 1 / 1;
+          border-radius: 7px;
+          background:
+            linear-gradient(135deg, rgba(116, 89, 214, var(--alpha)), rgba(192, 132, 252, calc(var(--alpha) + 0.08))),
+            rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(216, 180, 254, calc(var(--alpha) * 0.45));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+
+        .matrix-days {
+          grid-column: 2 / -1;
+          display: grid;
+          grid-template-columns: repeat(12, minmax(18px, 1fr));
+          gap: 7px;
+        }
+
+        .matrix-day {
+          color: rgba(220, 225, 255, 0.66);
+          font-size: 10px;
+          font-weight: 850;
+          text-align: center;
+        }
+
+        .side-stack {
+          grid-column: 2 / 3;
+          grid-row: 3 / 5;
+          display: grid;
+          grid-template-rows: 1fr 1fr 1fr;
+          gap: 12px;
+          min-height: 0;
+        }
+
+        .side-card {
+          padding: 14px;
+          min-height: 0;
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr);
+          gap: 10px;
+        }
+
+        .health-list,
+        .signal-list,
+        .access-list {
+          display: grid;
+          gap: 8px;
+          min-height: 0;
+          height: 100%;
+        }
+
+        .health-list,
+        .signal-list {
+          grid-template-rows: repeat(3, minmax(0, 1fr));
+        }
+
+        .access-list {
+          grid-template-rows: repeat(4, minmax(0, 1fr));
+        }
+
+        .health-row {
+          display: grid;
+          grid-template-columns: 28px minmax(0, 1fr) 40px;
+          align-items: center;
+          gap: 8px;
+          min-height: 0;
+          padding: 0 10px;
+          border-radius: 12px;
+          background: rgba(126, 184, 255, 0.04);
+          border: 1px solid rgba(126, 184, 255, 0.07);
+          transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .health-icon {
+          width: 28px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 11px;
+          color: rgba(126, 184, 255, 0.95);
+          background: rgba(46, 134, 245, 0.12);
+        }
+
+        .health-name,
+        .signal-name,
+        .access-name {
+          color: rgba(225, 230, 255, 0.72);
+          font-size: 11.5px;
+          font-weight: 800;
+        }
+
+        .track {
+          height: 6px;
+          margin-top: 5px;
+          border-radius: 999px;
+          background: rgba(126, 184, 255, 0.1);
+          overflow: hidden;
+        }
+
+        .fill {
+          height: 100%;
+          border-radius: inherit;
+          background: linear-gradient(90deg, #2e86f5, #38bdf8, #34d399);
+        }
+
+        .health-value,
+        .signal-value,
+        .access-value-small {
+          color: white;
+          font-size: 12px;
+          font-weight: 900;
+          text-align: right;
           font-variant-numeric: tabular-nums;
         }
 
+        .signal-row,
+        .access-row {
+          min-height: 0;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 10px;
+          padding: 0 10px;
+          border-radius: 10px;
+          background: rgba(126, 184, 255, 0.045);
+          border: 1px solid rgba(126, 184, 255, 0.08);
+          transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .bottom-grid {
+          grid-column: 1 / 2;
+          grid-row: 4 / 5;
+          display: grid;
+          grid-template-columns: 1.05fr 0.95fr;
+          gap: 12px;
+          min-height: 0;
+        }
+
+        .bottom-card {
+          padding: 14px;
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr);
+          gap: 10px;
+        }
+
+        .terms {
+          display: grid;
+          gap: 8px;
+          align-content: center;
+        }
+
+        .term-row {
+          display: grid;
+          grid-template-columns: 42px minmax(0, 1fr) 34px;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .term-label {
+          color: rgba(225, 230, 255, 0.68);
+          font-size: 11px;
+          font-weight: 850;
+        }
+
+        .term-value {
+          color: white;
+          font-size: 11px;
+          font-weight: 900;
+          text-align: right;
+        }
+
+        .ops-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+          align-items: stretch;
+        }
+
+        .op-card {
+          min-width: 0;
+          padding: 10px;
+          border-radius: 12px;
+          background: rgba(126, 184, 255, 0.045);
+          border: 1px solid rgba(126, 184, 255, 0.08);
+          transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+
+        .op-value {
+          color: white;
+          font-size: 20px;
+          font-weight: 900;
+          line-height: 1;
+          white-space: nowrap;
+        }
+
+        .op-label {
+          margin-top: 5px;
+          color: rgba(220, 225, 255, 0.5);
+          font-size: 10px;
+          font-weight: 800;
+          line-height: 1.2;
+        }
+
         .dashboard-state {
-          height: 100%;
+          grid-column: 1 / -1;
+          grid-row: 1 / -1;
           display: flex;
           align-items: center;
           justify-content: center;
-          color: rgba(203, 224, 255, 0.42);
+          color: rgba(220, 225, 255, 0.5);
           font-size: 13px;
           text-align: center;
         }
 
         @media (max-width: 1180px) {
-          .dashboard-shell {
-            grid-template-columns: 1fr;
+          .dashboard-page {
+            height: auto;
+            min-height: 0;
+            overflow: visible;
+            display: flex;
+            flex-direction: column;
           }
 
-          .dashboard-side {
-            display: grid;
+          .stat-grid,
+          .bottom-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
-            align-items: start;
-          }
-        }
-
-        @media (max-width: 920px) {
-          .dashboard-hero,
-          .stats-grid,
-          .analytics-grid,
-          .main-lower-grid,
-          .main-insights,
-          .dashboard-side {
-            grid-template-columns: 1fr;
           }
 
-          .stats-grid {
+          .side-stack {
             display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-rows: auto;
           }
         }
 
-        @media (max-width: 680px) {
-          .dashboard-hero {
-            padding: 14px;
-          }
-
-          .hero-title {
-            font-size: 24px;
-          }
-
-          .price-band-grid {
+        @media (max-width: 720px) {
+          .dash-hero,
+          .stat-grid,
+          .bottom-grid,
+          .ops-grid,
+          .side-stack {
             grid-template-columns: 1fr;
           }
 
-          .stat-value {
-            font-size: 22px;
+          .dash-title {
+            font-size: 21px;
+          }
+
+          .matrix {
+            grid-template-columns: 38px repeat(12, minmax(14px, 1fr));
+            gap: 5px;
           }
         }
       `}</style>
 
       <div className="dashboard-page">
         {loading ? (
-          <div className="dashboard-state glass-panel">
+          <div className="dashboard-state dash-card">
             <div>
-              <Loader2 className="animate-spin mb-3 mx-auto text-blue-400" size={30} />
+              <Loader2 className="animate-spin mb-3 mx-auto text-purple-300" size={30} />
               <p>Loading dashboard statistics...</p>
             </div>
           </div>
         ) : error ? (
-          <div className="dashboard-state glass-panel">{error}</div>
+          <div className="dashboard-state dash-card">{error}</div>
         ) : (
-          <div className="dashboard-shell">
-            <main className="dashboard-main">
-              <section className="dashboard-hero glass-panel">
-                <div className="hero-copy">
-                  <div>
-                    <div className="hero-kicker">
-                      <ShieldCheck size={13} />
-                      HopeCMS overview
-                    </div>
-                    <h1 className="hero-title">Customer Management Statistics</h1>
-                    <p className="hero-subtitle">
-                      Live operating snapshot for customer records, sales visibility, and read-only product catalogue pricing.
-                    </p>
-                  </div>
-                  <div className="hero-meta">
-                    <span className="hero-chip"><Users size={13} /> {stats.totalCustomers} customers</span>
-                    <span className="hero-chip"><ShoppingCart size={13} /> {stats.salesCount} sales</span>
-                    <span className="hero-chip"><Boxes size={13} /> {stats.productCount} products</span>
-                  </div>
-                </div>
+          <>
+            <section className="dash-hero dash-card">
+              <div>
+                <div className="dash-kicker"><Sparkles size={13} /> HopeCMS control room</div>
+                <h1 className="dash-title">Customer Management Statistics</h1>
+                <p className="dash-copy">A one-screen operating view for customers, sales, product pricing, data quality, and access posture.</p>
+              </div>
+            </section>
 
-                <div className="hero-orbit">
-                  <div className="hero-meter">
-                    <span className="meter-label">Active Customers</span>
-                    <span className="meter-value">{stats.activeRate}%</span>
+            <section className="access-card dash-card">
+              <span className="access-icon"><ShieldCheck size={20} /></span>
+              <div>
+                <span className="label">Current Access</span>
+                <span className="access-value">{user?.user_type || 'USER'}</span>
+              </div>
+            </section>
+
+            <section className="stat-grid">
+              {statCards.map((card) => {
+                const Icon = card.icon
+                return (
+                  <article className={`stat-card dash-card ${card.tone}`} key={card.label}>
+                    <div className="stat-top">
+                      <span className="label">{card.label}</span>
+                      <span className="stat-icon"><Icon size={17} /></span>
+                    </div>
                     <div>
-                      <div className="meter-track">
-                        <div className="meter-fill" style={{ width: `${stats.activeRate}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="stats-grid">
-                {statCards.map((card) => {
-                  const Icon = card.icon
-                  return (
-                    <article className={`stat-card ${card.tone}`} key={card.label}>
-                      <div className="stat-top">
-                        <span className="stat-label">{card.label}</span>
-                        <span className="stat-icon"><Icon size={17} /></span>
-                      </div>
                       <div className="stat-value">{card.value}</div>
                       <div className="stat-detail">{card.detail}</div>
-                    </article>
-                  )
-                })}
-              </section>
+                    </div>
+                  </article>
+                )
+              })}
+            </section>
 
-              <section className="health-panel glass-panel">
-                <div className="panel-title">
-                  <h2>System Health</h2>
-                  <span>record coverage</span>
+            <section className="matrix-card dash-card">
+              <div className="card-head">
+                <h2 className="card-title">Operational Pulse</h2>
+                <span className="card-hint">live system signal</span>
+              </div>
+
+              <div className="pulse-shell">
+                <div className="pulse-orbit" aria-label={`Operational pulse score ${pulseScore} percent`}>
+                  <div className="pulse-core">
+                    <span className="pulse-score">{pulseScore}</span>
+                    <span className="pulse-score-label">Pulse</span>
+                  </div>
+                  {pulseMetrics.map((metric) => {
+                    const toneMap = {
+                      cyan: ['#67e8f9', 'rgba(103, 232, 249, 0.62)'],
+                      blue: ['#60a5fa', 'rgba(96, 165, 250, 0.58)'],
+                      violet: ['#c4b5fd', 'rgba(196, 181, 253, 0.6)'],
+                      green: ['#86efac', 'rgba(134, 239, 172, 0.52)'],
+                      gold: ['#fcd34d', 'rgba(252, 211, 77, 0.52)'],
+                    }
+                    const [tone, glow] = toneMap[metric.tone] || toneMap.cyan
+
+                    return (
+                      <span
+                        className="pulse-node"
+                        key={metric.label}
+                        title={`${metric.label}: ${Math.round(metric.value)}%`}
+                        style={{
+                          '--x': `${metric.x}%`,
+                          '--y': `${metric.y}%`,
+                          '--value': metric.value,
+                          '--tone': tone,
+                          '--glow': glow,
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+
+                <div className="pulse-bars">
+                  {pulseMetrics.map((metric) => {
+                    const toneMap = {
+                      cyan: ['#67e8f9', 'rgba(103, 232, 249, 0.58)'],
+                      blue: ['#60a5fa', 'rgba(96, 165, 250, 0.54)'],
+                      violet: ['#c4b5fd', 'rgba(196, 181, 253, 0.58)'],
+                      green: ['#86efac', 'rgba(134, 239, 172, 0.5)'],
+                      gold: ['#fcd34d', 'rgba(252, 211, 77, 0.5)'],
+                    }
+                    const [tone, glow] = toneMap[metric.tone] || toneMap.cyan
+
+                    return (
+                      <div className="pulse-bar" key={metric.label}>
+                        <div className="pulse-name">
+                          {metric.label}
+                          <span className="pulse-detail">{metric.detail}</span>
+                        </div>
+                        <div className="pulse-track">
+                          <div
+                            className="pulse-fill"
+                            style={{
+                              '--value': `${metric.value}%`,
+                              '--tone': tone,
+                              '--glow': glow,
+                            }}
+                          />
+                        </div>
+                        <span className="pulse-value">{Math.round(metric.value)}%</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="pulse-footer">
+                <span className="pulse-chip">{stats.totalCustomers} customers monitored</span>
+                <span className="pulse-chip">{stats.salesCount} sales signals</span>
+              </div>
+            </section>
+
+            <aside className="side-stack">
+              <section className="side-card dash-card">
+                <div className="card-head">
+                  <h2 className="card-title">System Health</h2>
+                  <span className="card-hint">coverage</span>
                 </div>
                 <div className="health-list">
                   {healthItems.map((item) => {
                     const Icon = item.icon
                     return (
                       <div className="health-row" key={item.label}>
-                        <span className="health-icon"><Icon size={15} /></span>
+                        <span className="health-icon"><Icon size={14} /></span>
                         <div>
                           <span className="health-name">{item.label}</span>
-                          <div className="health-track">
-                            <div className="health-fill" style={{ width: `${item.value}%` }} />
-                          </div>
+                          <div className="track"><div className="fill" style={{ width: `${item.value}%` }} /></div>
                         </div>
                         <span className="health-value">{item.value}%</span>
                       </div>
@@ -1214,205 +1105,79 @@ function Dashboard() {
                 </div>
               </section>
 
-              <section className="main-insights">
-                {dashboardCharts.insights.map((item) => (
-                  <article className="insight-item glass-panel" key={item.label}>
-                    <span className="insight-label">{item.label}</span>
-                    <span className="insight-value">{item.value}</span>
-                    <span className="insight-detail">{item.detail}</span>
-                  </article>
-                ))}
-              </section>
-
-              <section className="main-lower-grid">
-                <article className="graph-panel glass-panel">
-                  <div className="panel-title">
-                    <h2>Operational Load</h2>
-                    <span>relative volume</span>
-                  </div>
-                  <div className="column-chart">
-                    {dashboardCharts.operationalBars.map((item) => (
-                      <div className={`chart-column ${item.tone}`} key={item.label}>
-                        <div className="column-track">
-                          <div className="column-fill" style={{ height: `${item.percent}%` }} />
-                        </div>
-                        <span className="column-value">{item.value}</span>
-                        <span className="column-label">{item.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-
-                <article className="coverage-panel glass-panel">
-                  <div className="panel-title">
-                    <h2>Module Coverage</h2>
-                    <span>scope</span>
-                  </div>
-                  <div className="coverage-grid">
-                    {dashboardCharts.moduleCoverage.map((item) => (
-                      <div className="coverage-card" key={item.label}>
-                        <div className="coverage-top">
-                          <span className="coverage-icon">{item.icon}</span>
-                          <span className="coverage-label">{item.label}</span>
-                        </div>
-                        <div>
-                          <div className="coverage-value">{item.value}</div>
-                          <div className="coverage-caption">{item.caption}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              </section>
-
-              <section className="analytics-grid">
-                <article className="analytics-panel glass-panel">
-                  <div className="panel-title">
-                    <h2>Payment Terms</h2>
-                    <span>customer split</span>
-                  </div>
-                  <div className="chart-stack">
-                    {dashboardCharts.paytermChart.map((item) => (
-                      <div className="bar-row" key={item.label}>
-                        <span className="bar-label">{item.label}</span>
-                        <div className="bar-track">
-                          <div className="bar-fill" style={{ width: `${item.percent}%` }} />
-                        </div>
-                        <span className="bar-value">{item.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-
-                <article className="analytics-panel glass-panel">
-                  <div className="panel-title">
-                    <h2>Status Mix</h2>
-                    <span>active vs inactive</span>
-                  </div>
-                  <div className="donut-panel">
-                    <div className="donut" style={{ '--active': stats.activeRate }}>
+              <section className="side-card dash-card">
+                <div className="card-head">
+                  <h2 className="card-title">Executive Signals</h2>
+                  <span className="card-hint">readiness</span>
+                </div>
+                <div className="signal-list">
+                  {signalRows.map((signal) => (
+                    <div className="signal-row" key={signal.label}>
                       <div>
-                        <strong>{stats.activeRate}%</strong>
-                        <span>Active</span>
+                        <span className="signal-name">{signal.label}</span>
+                        <div className="track"><div className="fill" style={{ width: `${signal.width}%` }} /></div>
                       </div>
-                    </div>
-                    <div className="status-list">
-                      {dashboardCharts.statusMix.map((item) => (
-                        <div className={`status-pill ${item.tone}`} key={item.label}>
-                          <span className="status-left">
-                            <span className="status-dot" />
-                            <span className="status-name">{item.label}</span>
-                          </span>
-                          <span className="status-number">{item.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </article>
-              </section>
-            </main>
-
-            <aside className="dashboard-side">
-              <section className="side-card glass-panel">
-                <div className="role-card">
-                  <span className="role-icon"><ShieldCheck size={18} /></span>
-                  <div>
-                    <span className="role-label">Current Access</span>
-                    <span className="role-value">{user?.user_type || 'USER'}</span>
-                  </div>
-                </div>
-              </section>
-
-              <section className="side-card glass-panel">
-                <div className="panel-title">
-                  <h2>Record Summary</h2>
-                  <span>counts</span>
-                </div>
-                <div className="mini-stack">
-                  <div className="mini-row">
-                    <span className="mini-label">Active customers</span>
-                    <span className="mini-value">{stats.activeCustomers}</span>
-                  </div>
-                  <div className="mini-row">
-                    <span className="mini-label">Inactive customers</span>
-                    <span className="mini-value">{stats.inactiveCustomers}</span>
-                  </div>
-                  <div className="mini-row">
-                    <span className="mini-label">Highest price</span>
-                    <span className="mini-value">{formatCurrency(stats.highestPrice)}</span>
-                  </div>
-                  <div className="mini-row">
-                    <span className="mini-label">Average price</span>
-                    <span className="mini-value">{formatCurrency(stats.averagePrice)}</span>
-                  </div>
-                </div>
-              </section>
-
-              <section className="side-card glass-panel">
-                <div className="panel-title">
-                  <h2>Price Bands</h2>
-                  <span>catalogue</span>
-                </div>
-                <div className="price-band-grid">
-                  {dashboardCharts.priceBands.map((band) => (
-                    <div className="price-band" key={band.label}>
-                      <div>
-                        <span className="price-band-label">{band.label}</span>
-                        <span className="price-band-hint">{band.hint}</span>
-                      </div>
-                      <span className="price-band-value">{band.value}</span>
+                      <span className="signal-value">{signal.value}</span>
                     </div>
                   ))}
                 </div>
               </section>
 
-              <section className="side-card glass-panel">
-                <div className="panel-title">
-                  <h2>Operations</h2>
-                  <span>quick read</span>
+              <section className="side-card dash-card">
+                <div className="card-head">
+                  <h2 className="card-title">Access Rules</h2>
+                  <span className="card-hint">current</span>
                 </div>
-                <div className="ops-card">
-                  {dashboardCharts.ops.map((item) => (
-                    <div className="ops-item" key={item.label}>
-                      <span className="ops-label">{item.label}</span>
-                      <span className="ops-value">{item.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="side-card glass-panel">
-                <div className="panel-title">
-                  <h2>Data Quality</h2>
-                  <span>audit</span>
-                </div>
-                <div className="rule-stack">
-                  {qualityRows.map((item) => (
-                    <div className="rule-row" key={item.label}>
-                      <span className="rule-name">{item.label}</span>
-                      <span className="rule-value">{item.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className="side-card glass-panel">
-                <div className="panel-title">
-                  <h2>Access Rules</h2>
-                  <span>current user</span>
-                </div>
-                <div className="rule-stack">
+                <div className="access-list">
                   {accessRows.map((item) => (
-                    <div className="rule-row" key={item.label}>
-                      <span className="rule-name">{item.label}</span>
-                      <span className={`rule-value ${item.value === 'SUPERADMIN' ? 'warn' : ''}`}>{item.value}</span>
+                    <div className="access-row" key={item.label}>
+                      <span className="access-name">{item.label}</span>
+                      <span className="access-value-small">{item.value}</span>
                     </div>
                   ))}
                 </div>
               </section>
-
             </aside>
-          </div>
+
+            <section className="bottom-grid">
+              <article className="bottom-card dash-card">
+                <div className="card-head">
+                  <h2 className="card-title">Payment Terms</h2>
+                  <span className="card-hint">customer split</span>
+                </div>
+                <div className="terms">
+                  {payterms.map((item) => (
+                    <div className="term-row" key={item.label}>
+                      <span className="term-label">{item.label}</span>
+                      <div className="track"><div className="fill" style={{ width: `${item.percent}%` }} /></div>
+                      <span className="term-value">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="bottom-card dash-card">
+                <div className="card-head">
+                  <h2 className="card-title">Quick Signals</h2>
+                  <span className="card-hint">non-redundant</span>
+                </div>
+                <div className="ops-grid">
+                  <div className="op-card">
+                    <span className="op-value">{stats.salesPerCustomer.toFixed(1)}</span>
+                    <span className="op-label">sales per customer</span>
+                  </div>
+                  <div className="op-card">
+                    <span className="op-value">{stats.unpricedProducts}</span>
+                    <span className="op-label">unpriced products</span>
+                  </div>
+                  <div className="op-card">
+                    <span className="op-value">{currency.format(Math.max(0, stats.highestPrice - stats.lowestPrice))}</span>
+                    <span className="op-label">price spread</span>
+                  </div>
+                </div>
+              </article>
+            </section>
+          </>
         )}
       </div>
     </>

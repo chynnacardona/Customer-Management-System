@@ -1,6 +1,6 @@
 import { X, ReceiptText, Loader2 } from 'lucide-react'
 
-function SalesDetailModal({ isOpen, onClose, transaction, details, isLoading }) {
+function SalesDetailModal({ isOpen, onClose, transaction, details, isLoading, error }) {
   if (!isOpen || !transaction) return null
 
   const formatCurrency = (value) =>
@@ -43,6 +43,7 @@ function SalesDetailModal({ isOpen, onClose, transaction, details, isLoading }) 
         .sales-detail-product-name { color: white; font-weight: 600; }
         .sales-detail-total-section { display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding-top: 20px; color: rgba(180, 210, 255, 0.4); font-size: 13px; }
         .sales-detail-total-section strong { color: #7eb8ff; font-size: 20px; font-weight: 800; }
+        .sales-detail-error { padding: 34px 18px; text-align: center; color: rgba(252, 165, 165, 0.95); font-size: 13px; }
       `}</style>
 
       <div className="sales-detail-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -78,6 +79,8 @@ function SalesDetailModal({ isOpen, onClose, transaction, details, isLoading }) 
                   <Loader2 className="animate-spin mx-auto mb-2" />
                   <span>Loading items...</span>
                 </div>
+              ) : error ? (
+                <div className="sales-detail-error">{error}</div>
               ) : (
                 <table className="sales-detail-table">
                   <thead>
