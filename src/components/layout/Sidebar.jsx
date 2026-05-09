@@ -14,6 +14,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/useAuth'
 import { useRights } from '../../context/useRights'
 import neuLogo from '../../assets/neu-logo.png'
+import { canManageDeletedCustomers, canViewAdmin as canViewAdminByRights } from '../../utils/accessRules'
 
 function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
@@ -24,8 +25,8 @@ function Sidebar() {
   const { rights, userType: rightsUserType } = useRights()
 
   const userType = rightsUserType ?? authUser?.user_type ?? 'USER'
-  const canViewAdmin = rights.ADM_USER === 1
-  const canViewDeletedCustomers = userType === 'ADMIN' || userType === 'SUPERADMIN'
+  const canViewAdmin = canViewAdminByRights(rights)
+  const canViewDeletedCustomers = canManageDeletedCustomers(userType)
 
   const sections = [
     {

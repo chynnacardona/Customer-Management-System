@@ -2,22 +2,17 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabase/supabaseClient';
 import { useAuth } from './useAuth';
 import { UserRightsContext } from './rightsContext';
+import { DEFAULT_RIGHTS } from '../utils/accessRules';
 
 export const UserRightsProvider = ({ children }) => {
   const { user } = useAuth();
-  const [rights, setRights] = useState({
-    CUST_VIEW: 0, CUST_ADD: 0, CUST_EDIT: 0, CUST_DEL: 0,
-    SALES_VIEW: 0, SD_VIEW: 0, PROD_VIEW: 0, PRICE_VIEW: 0, ADM_USER: 0,
-  });
+  const [rights, setRights] = useState(DEFAULT_RIGHTS);
   const [userType, setUserType] = useState(null);
   const [rightsLoading, setRightsLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
-      setRights({
-        CUST_VIEW: 0, CUST_ADD: 0, CUST_EDIT: 0, CUST_DEL: 0,
-        SALES_VIEW: 0, SD_VIEW: 0, PROD_VIEW: 0, PRICE_VIEW: 0, ADM_USER: 0,
-      });
+      setRights(DEFAULT_RIGHTS);
       setUserType(null);
       setRightsLoading(false);
       return;

@@ -6,16 +6,22 @@ import EditCustomerModal from '../../components/shared/EditCustomerModal'
 import SoftDeleteConfirmDialog from '../../components/shared/SoftDeleteConfirmDialog'
 import { customerService } from '../../services/customerService'
 import { useRights } from '../../context/useRights'
+import {
+  canAddCustomer as canAddCustomerByRights,
+  canDeleteCustomer as canDeleteCustomerByRights,
+  canEditCustomer as canEditCustomerByRights,
+  canManageDeletedCustomers,
+} from '../../utils/accessRules'
 
 function CustomerListPage() {
   const navigate = useNavigate()
   const { rights, userType } = useRights()
   const effectiveUserType = userType ?? 'USER'
-  const canRecoverDeleted = userType === 'ADMIN' || userType === 'SUPERADMIN'
-  const canAddCustomer = rights.CUST_ADD === 1
-  const canEditCustomer = rights.CUST_EDIT === 1
-  const canDeleteCustomer = rights.CUST_DEL === 1
-  const canSeeStamp = userType === 'ADMIN' || userType === 'SUPERADMIN'
+  const canRecoverDeleted = canManageDeletedCustomers(userType)
+  const canAddCustomer = canAddCustomerByRights(rights)
+  const canEditCustomer = canEditCustomerByRights(rights)
+  const canDeleteCustomer = canDeleteCustomerByRights(rights)
+  const canSeeStamp = canManageDeletedCustomers(userType)
   const tableColumnCount = canSeeStamp ? 7 : 6
   
   const [customers, setCustomers] = useState([])
