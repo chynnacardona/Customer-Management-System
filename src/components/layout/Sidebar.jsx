@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
+  BarChart3,
   LayoutDashboard,
   LogOut,
   Package,
@@ -41,6 +42,14 @@ function Sidebar() {
         { icon: Users, label: 'Customers', path: '/customers' },
         { icon: ShoppingCart, label: 'Sales', path: '/sales' },
         { icon: Package, label: 'Products', path: '/products' },
+      ],
+    },
+    {
+      label: 'Reports',
+      items: [
+        { icon: BarChart3, label: 'Sales Summary', path: '/reports/customer-sales-summary' },
+        { icon: BarChart3, label: 'Top Customers', path: '/reports/top-customers' },
+        { icon: BarChart3, label: 'Product Revenue', path: '/reports/product-revenue' },
       ],
     },
     {
