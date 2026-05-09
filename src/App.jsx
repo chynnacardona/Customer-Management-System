@@ -14,8 +14,8 @@ import UserManagement from "./pages/admin/UserManagement";
 import ProductCatalog from "./pages/products/ProductCatalog";
 import SalesList from "./pages/sales/SalesList";
 import Dashboard from "./pages/dashboard/Dashboard";
-import { useAuth } from "./context/useAuth";
 import { useRights } from "./context/useRights";
+import { canManageDeletedCustomers } from "./utils/accessRules";
 
 function AdminRoute({ children }) {
   const { rights, rightsLoading } = useRights();
@@ -32,10 +32,13 @@ function AdminRoute({ children }) {
 }
 
 function DeletedCustomersRoute({ children }) {
-  const { user } = useAuth();
-  const userType = user?.user_type ?? 'USER';
+  const { userType, rightsLoading } = useRights();
 
-  if (userType !== 'ADMIN' && userType !== 'SUPERADMIN') {
+  if (rightsLoading) {
+    return <div className="flex h-screen items-center justify-center">Loading permissions...</div>;
+  }
+
+  if (!canManageDeletedCustomers(userType)) {
     return <Navigate to="/customers" replace />;
   }
 

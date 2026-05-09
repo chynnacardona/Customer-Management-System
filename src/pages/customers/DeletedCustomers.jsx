@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Loader2, RotateCcw, Search, ShieldCheck, Trash2 } from 'lucide-react'
 import { useAuth } from '../../context/useAuth'
 import { customerService } from '../../services/customerService'
+import { canManageDeletedCustomers } from '../../utils/accessRules'
 
 function DeletedCustomers() {
   const { user } = useAuth()
@@ -12,7 +13,7 @@ function DeletedCustomers() {
   const [error, setError] = useState('')
 
   const userType = user?.user_type ?? 'USER'
-  const canViewDeletedCustomers = userType === 'ADMIN' || userType === 'SUPERADMIN'
+  const canViewDeletedCustomers = canManageDeletedCustomers(userType)
 
   const loadDeletedCustomers = useCallback(async () => {
     if (!canViewDeletedCustomers) {
