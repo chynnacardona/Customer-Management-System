@@ -14,6 +14,9 @@ import UserManagement from "./pages/admin/UserManagement";
 import ProductCatalog from "./pages/products/ProductCatalog";
 import SalesList from "./pages/sales/SalesList";
 import Dashboard from "./pages/dashboard/Dashboard";
+import CustomerSalesSummary from "./pages/reports/CustomerSalesSummary";
+import TopCustomers from "./pages/reports/TopCustomers";
+import ProductRevenue from "./pages/reports/ProductRevenue";
 import { useRights } from "./context/useRights";
 import { canManageDeletedCustomers } from "./utils/accessRules";
 
@@ -71,6 +74,9 @@ function App() {
           <Route path="customers/:custno" element={<CustomerDetail />} />
           <Route path="sales" element={<SalesList />} />
           <Route path="products" element={<ProductCatalog />} />
+          <Route path="reports/customer-sales-summary" element={<CustomerSalesSummary />} />
+          <Route path="reports/top-customers" element={<TopCustomers />} />
+          <Route path="reports/product-revenue" element={<ProductRevenue />} />
           <Route path="admin" element={<AdminRoute><UserManagement /></AdminRoute>} />
           <Route path="deleted-customers" element={<DeletedCustomersRoute><DeletedCustomers /></DeletedCustomersRoute>} />
           
