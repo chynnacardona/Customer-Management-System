@@ -6,6 +6,7 @@ import Register from "./pages/auth/Register";
 import AppShell from "./components/layout/AppShell";
 import AuthCallback from "./pages/auth/AuthCallback";
 import ProtectedRoute from "./pages/auth/ProtectedRoute";
+import AdminRoute from "./pages/auth/AdminRoute";
 
 import CustomerList from "./pages/customers/CustomerList";
 import CustomerDetail from "./pages/customers/CustomerDetail";
@@ -40,7 +41,15 @@ function App() {
           <Route path="sales" element={<SalesList />} />
           <Route path="products" element={<ProductCatalog />} />
           <Route path="admin" element={<UserManagement />} />
-          <Route path="deleted-customers" element={<DeletedCustomers />} />
+          
+          <Route 
+            path="deleted-customers" 
+            element={
+              <AdminRoute>
+                <DeletedCustomers />
+              </AdminRoute>
+            } 
+          />
           
           <Route path="*" element={<Navigate to="/customers" replace />} />
         </Route>
