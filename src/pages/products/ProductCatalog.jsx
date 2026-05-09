@@ -6,16 +6,18 @@ function ProductCatalog() {
   const [search, setSearch] = useState('')
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const fetchLiveCatalog = async () => {
       try {
         setLoading(true)
+        setError('')
         // One single fetch gets products AND their price history
         const productList = await getProducts()
         setProducts(productList)
       } catch (err) {
-        console.error("Failed to load catalog:", err.message)
+        setError(err.message || 'Unable to load product catalogue.')
       } finally {
         setLoading(false)
       }
@@ -45,6 +47,10 @@ function ProductCatalog() {
       <style>{`
         @keyframes productPageIn {
           from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes productCardIn {
+          from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
 
@@ -103,16 +109,17 @@ function ProductCatalog() {
           align-items: center;
           gap: 8px;
           min-width: 260px;
-          background: rgba(100, 160, 255, 0.04);
-          border: 1px solid rgba(100, 160, 255, 0.1);
+          background: rgba(126, 184, 255, 0.04);
+          border: 1px solid rgba(126, 184, 255, 0.12);
           border-radius: 10px;
           padding: 8px 12px;
+          transition: all 0.2s ease;
         }
 
         .product-search:focus-within {
-          border-color: rgba(100, 160, 255, 0.3);
-          background: rgba(100, 160, 255, 0.07);
-          box-shadow: 0 0 0 3px rgba(60, 120, 255, 0.08);
+          border-color: rgba(56, 189, 248, 0.34);
+          background: rgba(126, 184, 255, 0.07);
+          box-shadow: 0 0 0 3px rgba(46, 134, 245, 0.1);
         }
 
         .product-search svg {
@@ -139,11 +146,20 @@ function ProductCatalog() {
           display: flex;
           align-items: center;
           gap: 10px;
-          background: rgba(8, 18, 40, 0.62);
-          border: 1px solid rgba(100, 160, 255, 0.1);
+          background: linear-gradient(180deg, rgba(126, 184, 255, 0.035), transparent 44%), linear-gradient(145deg, rgba(8, 18, 40, 0.84), rgba(3, 9, 24, 0.9));
+          border: 1px solid rgba(126, 184, 255, 0.12);
           border-radius: 14px;
           padding: 14px;
           color: rgba(126, 184, 255, 0.76);
+          box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255,255,255,0.045);
+          animation: productCardIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+          transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+        }
+
+        .product-stat:hover {
+          transform: translateY(-2px);
+          border-color: rgba(126, 184, 255, 0.24);
+          box-shadow: 0 18px 38px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.07);
         }
 
         .product-stat-label {
@@ -168,11 +184,19 @@ function ProductCatalog() {
           min-height: 0;
           display: flex;
           flex-direction: column;
-          background: rgba(8, 18, 40, 0.62);
-          border: 1px solid rgba(100, 160, 255, 0.1);
-          border-radius: 16px;
+          background: linear-gradient(180deg, rgba(126, 184, 255, 0.035), transparent 44%), linear-gradient(145deg, rgba(8, 18, 40, 0.84), rgba(3, 9, 24, 0.9));
+          border: 1px solid rgba(126, 184, 255, 0.12);
+          border-radius: 18px;
           overflow: hidden;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.045);
+          animation: productCardIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+          transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+        }
+
+        .product-table-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(126, 184, 255, 0.24);
+          box-shadow: 0 22px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255,255,255,0.07);
         }
 
         .product-table-scroll {
@@ -268,7 +292,7 @@ function ProductCatalog() {
           letter-spacing: 0.12em;
           text-transform: uppercase;
           white-space: nowrap;
-          background: rgba(10, 24, 52, 0.96);
+          background: rgba(6, 16, 36, 0.96);
           backdrop-filter: blur(12px);
           border-bottom: 1px solid rgba(100, 160, 255, 0.08);
           box-shadow: 0 1px 0 rgba(100, 160, 255, 0.1), 0 10px 18px rgba(2, 8, 24, 0.18);
@@ -283,7 +307,12 @@ function ProductCatalog() {
         }
 
         .product-table tbody tr:hover {
-          background: rgba(100, 160, 255, 0.06);
+          background: rgba(126, 184, 255, 0.07);
+          box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.75);
+        }
+
+        .product-table tbody tr {
+          transition: background 0.18s ease, box-shadow 0.18s ease;
         }
 
         .product-code {
@@ -322,6 +351,13 @@ function ProductCatalog() {
           padding: 48px 16px;
           text-align: center;
           color: rgba(180, 210, 255, 0.28);
+          font-size: 13px;
+        }
+
+        .product-error {
+          padding: 48px 16px;
+          text-align: center;
+          color: rgba(252, 165, 165, 0.95);
           font-size: 13px;
         }
 
@@ -372,6 +408,8 @@ function ProductCatalog() {
               <Loader2 className="animate-spin mb-3 mx-auto text-blue-400" size={32} />
               <p>Fetching latest inventory records...</p>
             </div>
+          ) : error ? (
+            <div className="product-error">{error}</div>
           ) : filteredProducts.length === 0 ? (
             <div className="product-empty">No products found</div>
           ) : (

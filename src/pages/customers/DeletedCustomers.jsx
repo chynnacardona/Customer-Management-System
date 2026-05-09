@@ -68,6 +68,10 @@ function DeletedCustomers() {
           from { opacity: 0; transform: translateY(16px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes deletedCardIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
 
         .deleted-page {
           animation: deletedPageIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -123,17 +127,17 @@ function DeletedCustomers() {
           align-items: center;
           gap: 8px;
           min-width: 270px;
-          background: rgba(100, 160, 255, 0.04);
-          border: 1px solid rgba(100, 160, 255, 0.1);
+          background: rgba(126, 184, 255, 0.04);
+          border: 1px solid rgba(126, 184, 255, 0.12);
           border-radius: 10px;
           padding: 8px 12px;
           transition: all 0.2s ease;
         }
 
         .deleted-search:focus-within {
-          border-color: rgba(100, 160, 255, 0.3);
-          background: rgba(100, 160, 255, 0.07);
-          box-shadow: 0 0 0 3px rgba(60, 120, 255, 0.08);
+          border-color: rgba(56, 189, 248, 0.34);
+          background: rgba(126, 184, 255, 0.07);
+          box-shadow: 0 0 0 3px rgba(46, 134, 245, 0.1);
         }
 
         .deleted-search svg {
@@ -157,10 +161,20 @@ function DeletedCustomers() {
         .deleted-access-card,
         .deleted-summary-card,
         .deleted-table-card {
-          background: rgba(8, 18, 40, 0.62);
-          border: 1px solid rgba(100, 160, 255, 0.1);
-          border-radius: 16px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          background: linear-gradient(180deg, rgba(126, 184, 255, 0.035), transparent 44%), linear-gradient(145deg, rgba(8, 18, 40, 0.84), rgba(3, 9, 24, 0.9));
+          border: 1px solid rgba(126, 184, 255, 0.12);
+          border-radius: 18px;
+          box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.045);
+          animation: deletedCardIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+          transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+        }
+
+        .deleted-access-card:hover,
+        .deleted-summary-card:hover,
+        .deleted-table-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(126, 184, 255, 0.24);
+          box-shadow: 0 22px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255,255,255,0.07);
         }
 
         .deleted-access-card {
@@ -258,7 +272,7 @@ function DeletedCustomers() {
           letter-spacing: 0.12em;
           text-transform: uppercase;
           white-space: nowrap;
-          background: rgba(100, 160, 255, 0.03);
+          background: rgba(6, 16, 36, 0.96);
           border-bottom: 1px solid rgba(100, 160, 255, 0.08);
         }
 
@@ -275,7 +289,12 @@ function DeletedCustomers() {
         }
 
         .deleted-table tbody tr:hover {
-          background: rgba(100, 160, 255, 0.06);
+          background: rgba(126, 184, 255, 0.07);
+          box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.75);
+        }
+
+        .deleted-table tbody tr {
+          transition: background 0.18s ease, box-shadow 0.18s ease;
         }
 
         .deleted-custno {
@@ -315,6 +334,7 @@ function DeletedCustomers() {
           transform: translateY(-1px);
           background: rgba(34, 197, 94, 0.13);
           border-color: rgba(34, 197, 94, 0.28);
+          box-shadow: 0 10px 24px rgba(34, 197, 94, 0.14);
         }
 
         .recover-btn:disabled {
