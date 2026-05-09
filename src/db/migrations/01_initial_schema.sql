@@ -257,8 +257,7 @@ INSERT INTO priceHist VALUES('2011-02-01','NB0005', 1184.72);
 CREATE TABLE sales (
     transNo VARCHAR(8) PRIMARY KEY,
     salesDate DATE,
-    custNo VARCHAR(5) REFERENCES customer(custno),
-    empNo VARCHAR(5) REFERENCES employee(empno)
+    custNo VARCHAR(5) REFERENCES customer(custno)
 );
 
 -- Insert rows sales
