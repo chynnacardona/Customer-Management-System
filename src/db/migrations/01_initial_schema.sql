@@ -72,11 +72,11 @@ INSERT INTO product VALUES('PS0003','Cisco Virt Hardware', 'pc');
 
 -- 2. Create Customer (Parent)
 CREATE TABLE customer (
-    custno VARCHAR(5) NOT NULL PRIMARY KEY, 
-    custname VARCHAR(20) NOT NULL, 
+    custno VARCHAR(5) NOT NULL PRIMARY KEY,
+    custname VARCHAR(20) NOT NULL,
     address VARCHAR(50),
-    payterm VARCHAR(3) CONSTRAINT pay_ck CHECK (payterm IN ('COD', '30D', '45D')), 
-    record_status VARCHAR(10) NOT NULL DEFAULT 'ACTIVE', 
+    payterm VARCHAR(3) CONSTRAINT pay_ck CHECK (payterm IN ('COD', '30D', '45D')),
+    record_status VARCHAR(10) NOT NULL DEFAULT 'ACTIVE',
     stamp VARCHAR(60)
 );
 
@@ -255,8 +255,8 @@ INSERT INTO priceHist VALUES('2011-02-01','NB0005', 1184.72);
 
 -- 4. Create Sales (Child of Customer)
 CREATE TABLE sales (
-    transNo VARCHAR(8) PRIMARY KEY, 
-    salesDate DATE, 
+    transNo VARCHAR(8) PRIMARY KEY,
+    salesDate DATE,
     custNo VARCHAR(5) REFERENCES customer(custno),
     empNo VARCHAR(5) REFERENCES employee(empno)
 );

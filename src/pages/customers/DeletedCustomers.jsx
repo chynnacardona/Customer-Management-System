@@ -1,50 +1,63 @@
-import { useMemo, useState } from 'react'
-import { AlertTriangle, RotateCcw, Search, ShieldCheck, Trash2 } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
-
-// para kay M1: palitan to ng real INACTIVE customers galing recover/getCustomers service kapag ready na yung service layer
-const DUMMY_DELETED_CUSTOMERS = [
-  {
-    custno: 'C0007',
-    custname: 'Carlos Mendoza',
-    stamp: 'DEACTIVATED by SUPERADMIN on 2026-04-12 09:18 AM',
-  },
-  {
-    custno: 'C0014',
-    custname: 'Ramon Bautista',
-    stamp: 'DEACTIVATED by SUPERADMIN on 2026-04-18 02:41 PM',
-  },
-  {
-    custno: 'C0021',
-    custname: 'Elena Villanueva',
-    stamp: 'DEACTIVATED by SUPERADMIN on 2026-04-23 11:05 AM',
-  },
-]
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, Loader2, RotateCcw, Search, ShieldCheck, Trash2 } from 'lucide-react'
+import { useAuth } from '../../context/useAuth'
+import { customerService } from '../../services/customerService'
 
 function DeletedCustomers() {
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [recoveringCustno, setRecoveringCustno] = useState(null)
+  const [customers, setCustomers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // para kay M4: final user_type value dapat manggaling sa Auth/UserRights context
-  const userType = user?.user_type ?? 'ADMIN'
+  const userType = user?.user_type ?? 'USER'
   const canViewDeletedCustomers = userType === 'ADMIN' || userType === 'SUPERADMIN'
+
+  const loadDeletedCustomers = useCallback(async () => {
+    if (!canViewDeletedCustomers) {
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError('')
+      const data = await customerService.getDeletedCustomers()
+      setCustomers(data || [])
+    } catch (err) {
+      setError(err.message || 'Unable to load inactive customers.')
+    } finally {
+      setLoading(false)
+    }
+  }, [canViewDeletedCustomers])
+
+  useEffect(() => {
+    loadDeletedCustomers()
+  }, [loadDeletedCustomers])
 
   const filteredCustomers = useMemo(() => {
     const term = search.toLowerCase().trim()
-    if (!term) return DUMMY_DELETED_CUSTOMERS
+    if (!term) return customers
 
-    return DUMMY_DELETED_CUSTOMERS.filter((customer) =>
+    return customers.filter((customer) =>
       customer.custno.toLowerCase().includes(term) ||
       customer.custname.toLowerCase().includes(term) ||
-      customer.stamp.toLowerCase().includes(term)
+      (customer.stamp || customer.record_status || '').toLowerCase().includes(term)
     )
-  }, [search])
+  }, [customers, search])
 
-  const handleRecover = (customer) => {
-    // para kay M1: palitan to ng recoverCustomer(customer.custno) kapag ready na yung API function
-    setRecoveringCustno(customer.custno)
-    window.setTimeout(() => setRecoveringCustno(null), 500)
+  const handleRecover = async (customer) => {
+    try {
+      setRecoveringCustno(customer.custno)
+      setError('')
+      await customerService.recoverCustomer(customer.custno)
+      await loadDeletedCustomers()
+    } catch (err) {
+      setError(err.message || 'Unable to recover customer.')
+    } finally {
+      setRecoveringCustno(null)
+    }
   }
 
   return (
@@ -315,6 +328,15 @@ function DeletedCustomers() {
           font-size: 13px;
         }
 
+        .deleted-error {
+          padding: 12px 14px;
+          border-radius: 12px;
+          border: 1px solid rgba(248, 113, 113, 0.2);
+          background: rgba(239, 68, 68, 0.08);
+          color: rgba(252, 165, 165, 0.95);
+          font-size: 12.5px;
+        }
+
         @media (max-width: 780px) {
           .deleted-search { min-width: 100%; }
           .deleted-summary-card {
@@ -332,8 +354,10 @@ function DeletedCustomers() {
             <div>
               <h1 className="deleted-title">Deleted Customers</h1>
               <p className="deleted-subtitle">Inactive customer records available for recovery</p>
-            </div>
           </div>
+        </div>
+
+        {error && <div className="deleted-error">{error}</div>}
 
           {canViewDeletedCustomers && (
             <div className="deleted-search">
@@ -374,7 +398,12 @@ function DeletedCustomers() {
             </section>
 
             <section className="deleted-table-card">
-              {filteredCustomers.length === 0 ? (
+              {loading ? (
+                <div className="deleted-empty">
+                  <Loader2 className="animate-spin mb-3 mx-auto text-blue-400" size={28} />
+                  <p>Loading inactive customers...</p>
+                </div>
+              ) : filteredCustomers.length === 0 ? (
                 <div className="deleted-empty">No inactive customers found</div>
               ) : (
                 <div className="deleted-table-scroll">
@@ -392,9 +421,8 @@ function DeletedCustomers() {
                         <tr key={customer.custno}>
                           <td className="deleted-custno">{customer.custno}</td>
                           <td className="deleted-custname">{customer.custname}</td>
-                          <td className="deleted-stamp">{customer.stamp}</td>
+                          <td className="deleted-stamp">{customer.stamp || customer.record_status || 'INACTIVE'}</td>
                           <td>
-                            {/* para kay M4/M1: button visible lang sa ADMIN/SUPERADMIN; onClick ikabit sa recoverCustomer */}
                             <button
                               className="recover-btn"
                               disabled={recoveringCustno === customer.custno}

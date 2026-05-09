@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase/supabaseClient';
 import ParticlesBg from '../../components/layout/ParticlesBg'; 
@@ -7,38 +7,40 @@ const AuthCallback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 1. Listen for the session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
-        // Navigate to root to let ProtectedRoute handle the redirect
-        // replace: true prevents the user from going back to the loading screen
         navigate('/', { replace: true });
       } else if (event === 'SIGNED_OUT') {
         navigate('/login', { replace: true });
       }
     });
 
-    // 2. Immediate session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         navigate('/', { replace: true });
       }
     });
 
-    // 3. Cleanup
     return () => {
       subscription.unsubscribe();
     };
   }, [navigate]);
 
   return (
-    <div style={styles.container}>
-      <ParticlesBg />
-      <div style={styles.loaderBox}>
-        <div style={styles.spinner}></div>
-        <p style={styles.text}>Verifying account...</p>
+    <>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div style={styles.container}>
+        <ParticlesBg />
+        <div style={styles.loaderBox}>
+          <div style={styles.spinner}></div>
+          <p style={styles.text}>Verifying account...</p>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -73,7 +75,7 @@ const styles = {
     border: '3px solid rgba(100, 160, 255, 0.1)',
     borderTop: '3px solid #7eb8ff',
     borderRadius: '50%',
-    animation: 'spin 1s linear infinite', // Note: ensure you have this @keyframes in your CSS
+    animation: 'spin 1s linear infinite',
   },
   text: {
     fontSize: '14px',

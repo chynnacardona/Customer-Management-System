@@ -1,14 +1,23 @@
+import { useState } from 'react'
 import { X, Trash2, AlertTriangle } from 'lucide-react'
 
-// para kay M1: i-replace yung onConfirm handler ng actual na softDeleteCustomer() API call
 function SoftDeleteConfirmDialog({ isOpen, onClose, onConfirm, customer }) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
   if (!isOpen) return null
 
-  const handleConfirm = () => {
-    // para kay M1: ilagay dito yung softDeleteCustomer(customer.custno) API call
-    console.log('Soft Delete Customer:', customer?.custno)
-    onConfirm?.()
-    onClose()
+  const handleConfirm = async () => {
+    try {
+      setSaving(true)
+      setError('')
+      await onConfirm?.(customer)
+      onClose()
+    } catch (err) {
+      setError(err.message || 'Unable to deactivate customer.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -177,6 +186,9 @@ function SoftDeleteConfirmDialog({ isOpen, onClose, onConfirm, customer }) {
         }
 
         .btn-delete:active { transform: translateY(0); }
+        .btn-delete:disabled,
+        .btn-cancel:disabled { opacity: 0.55; cursor: wait; transform: none; }
+        .dialog-error { color: #fca5a5; font-size: 12px; line-height: 1.45; margin: 12px 0 0; }
       `}</style>
 
       <div className="dialog-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -210,14 +222,16 @@ function SoftDeleteConfirmDialog({ isOpen, onClose, onConfirm, customer }) {
             <p className="dialog-note">
               * This action can be reversed by an Admin or Superadmin.
             </p>
+
+            {error && <p className="dialog-error">{error}</p>}
           </div>
 
           {/* Footer */}
           <div className="dialog-footer">
-            <button className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button className="btn-delete" onClick={handleConfirm}>
+            <button className="btn-cancel" onClick={onClose} disabled={saving}>Cancel</button>
+            <button className="btn-delete" onClick={handleConfirm} disabled={saving}>
               <Trash2 size={13} />
-              Deactivate
+              {saving ? 'Deactivating...' : 'Deactivate'}
             </button>
           </div>
 
