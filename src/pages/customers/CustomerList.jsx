@@ -20,7 +20,7 @@ function CustomerListPage() {
   const canRecoverDeleted = canManageDeletedCustomers(userType)
   const canAddCustomer = canAddCustomerByRights(rights)
   const canEditCustomer = canEditCustomerByRights(rights)
-  const canDeleteCustomer = canDeleteCustomerByRights(rights)
+  const canDeleteCustomer = userType === 'SUPERADMIN' && canDeleteCustomerByRights(rights)
   const canSeeStamp = canManageDeletedCustomers(userType)
   const tableColumnCount = canSeeStamp ? 7 : 6
   
@@ -114,7 +114,7 @@ function CustomerListPage() {
         .table-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, rgba(46, 134, 245, 0.82), rgba(26, 79, 214, 0.88)); border-radius: 999px; border: 2px solid rgba(5, 16, 48, 0.78); }
         .table-scroll::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, rgba(96, 165, 250, 0.92), rgba(46, 134, 245, 0.92)); }
         .table-scroll::-webkit-scrollbar-corner { background: rgba(5, 16, 48, 0.6); }
-        .data-table { width: 100%; min-width: 860px; height: 100%; border-collapse: collapse; display: flex; flex-direction: column; }
+        .data-table { width: 100%; min-width: 960px; height: 100%; border-collapse: collapse; display: flex; flex-direction: column; }
         .data-table thead { flex: 0 0 auto; display: table; width: 100%; table-layout: fixed; }
         .data-table tbody { flex: 1; min-height: 0; display: block; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: rgba(126, 184, 255, 0.45) rgba(8, 18, 40, 0.28); }
         .data-table tbody::-webkit-scrollbar { width: 11px; }
@@ -124,13 +124,27 @@ function CustomerListPage() {
         .data-table tbody tr { display: table; width: 100%; table-layout: fixed; }
         .data-table thead th { padding: 12px 16px; text-align: left; font-size: 10px; font-weight: 700; color: rgba(180, 210, 255, 0.46); letter-spacing: 0.12em; text-transform: uppercase; background: rgba(6, 16, 36, 0.96); backdrop-filter: blur(12px); box-shadow: 0 1px 0 rgba(126, 184, 255, 0.12), 0 10px 18px rgba(2, 8, 24, 0.18); }
         .data-table thead th { position: relative; z-index: 3; }
+        .data-table:not(.with-stamp) th:nth-child(1), .data-table:not(.with-stamp) td:nth-child(1) { width: 13%; }
+        .data-table:not(.with-stamp) th:nth-child(2), .data-table:not(.with-stamp) td:nth-child(2) { width: 18%; }
+        .data-table:not(.with-stamp) th:nth-child(3), .data-table:not(.with-stamp) td:nth-child(3) { width: 30%; }
+        .data-table:not(.with-stamp) th:nth-child(4), .data-table:not(.with-stamp) td:nth-child(4) { width: 13%; }
+        .data-table:not(.with-stamp) th:nth-child(5), .data-table:not(.with-stamp) td:nth-child(5) { width: 14%; }
+        .data-table:not(.with-stamp) th:nth-child(6), .data-table:not(.with-stamp) td:nth-child(6) { width: 12%; }
+        .data-table.with-stamp th:nth-child(1), .data-table.with-stamp td:nth-child(1) { width: 12%; }
+        .data-table.with-stamp th:nth-child(2), .data-table.with-stamp td:nth-child(2) { width: 17%; }
+        .data-table.with-stamp th:nth-child(3), .data-table.with-stamp td:nth-child(3) { width: 24%; }
+        .data-table.with-stamp th:nth-child(4), .data-table.with-stamp td:nth-child(4) { width: 12%; }
+        .data-table.with-stamp th:nth-child(5), .data-table.with-stamp td:nth-child(5) { width: 13%; }
+        .data-table.with-stamp th:nth-child(6), .data-table.with-stamp td:nth-child(6) { width: 14%; }
+        .data-table.with-stamp th:nth-child(7), .data-table.with-stamp td:nth-child(7) { width: 8%; }
         .data-table tbody tr { border-bottom: 1px solid rgba(126, 184, 255, 0.06); transition: background 0.18s ease, box-shadow 0.18s ease; cursor: pointer; }
         .data-table tbody tr:hover { background: rgba(126, 184, 255, 0.07); box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.75); }
         .data-table tbody td { padding: 12px 16px; font-size: 12.5px; color: rgba(180, 210, 255, 0.7); }
+        .data-table th.actions-col, .data-table td.actions-col { text-align: center; }
         .custno-cell { font-family: monospace; font-size: 12px; color: rgba(180, 210, 255, 0.45); }
         .custname-cell { font-weight: 600; color: rgba(220, 235, 255, 0.9) !important; }
         .payterm-badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; border: 1px solid; }
-        .action-cell { display: flex; align-items: center; gap: 4px; }
+        .action-cell { display: flex; align-items: center; justify-content: center; gap: 4px; }
         .action-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid transparent; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: rgba(180, 210, 255, 0.3); transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease; }
         .action-btn:hover { transform: translateY(-1px) scale(1.05); }
         .action-btn.view:hover { color: #60a5fa; background: rgba(59, 130, 246, 0.1); }
@@ -169,7 +183,7 @@ function CustomerListPage() {
 
         <div className="table-container">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className={`data-table ${canSeeStamp ? 'with-stamp' : ''}`}>
               <thead>
                 <tr>
                   <th>Cust No.</th>
@@ -178,7 +192,7 @@ function CustomerListPage() {
                   <th>Pay Term</th>
                   <th>Status</th>
                   {canSeeStamp && <th>Stamp</th>}
-                  <th>Actions</th>
+                  <th className="actions-col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -210,7 +224,7 @@ function CustomerListPage() {
                             {customer.payterm}
                           </span>
                         </td>
-                        <td>
+                        <td className="actions-col">
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(74, 222, 128, 0.8)' }}>
                             <UserCheck size={11} />
                             {customer.record_status}

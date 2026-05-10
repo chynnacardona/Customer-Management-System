@@ -63,7 +63,14 @@ function Sidebar() {
           : []),
       ],
     },
-  ]
+  ].filter((section) => section.items.length > 0)
+
+  const avatarUrl =
+    authUser?.user_metadata?.avatar_url ||
+    authUser?.user_metadata?.picture ||
+    authUser?.identities?.find((identity) => identity.identity_data?.avatar_url || identity.identity_data?.picture)
+      ?.identity_data?.avatar_url ||
+    authUser?.identities?.find((identity) => identity.identity_data?.picture)?.identity_data?.picture
 
   const user = {
     name: authUser?.full_name ?? authUser?.user_metadata?.full_name ?? 'Hope User',
@@ -75,6 +82,7 @@ function Sidebar() {
       .map((part) => part.charAt(0).toUpperCase())
       .join('') || 'A',
     role: userType,
+    avatarUrl,
   }
 
   const handleSignOut = async () => {
@@ -452,6 +460,14 @@ function Sidebar() {
           font-size: 12px;
           font-weight: 850;
           box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
+          overflow: hidden;
+        }
+
+        .user-avatar-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
 
         .user-info {
@@ -669,7 +685,13 @@ function Sidebar() {
         <div className="user-accent" />
 
         <div className="sidebar-user">
-          <div className="user-avatar">{user.initials}</div>
+          <div className="user-avatar">
+            {user.avatarUrl ? (
+              <img className="user-avatar-img" src={user.avatarUrl} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              user.initials
+            )}
+          </div>
           <div className="user-info">
             <span className="user-name">{user.name}</span>
             <span className="user-email">{user.email}</span>
