@@ -10,6 +10,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { supabase } from '../../supabase/supabaseClient'
+import { getUsers, activateUser, deactivateUser } from '../../services/adminApi'
 
 const USER_SELECT = 'userId, email, full_name, user_type, record_status'
 
@@ -29,18 +30,12 @@ function UserManagement() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
+  // PR-01: Fetch Users using the Service Layer
   const loadUsers = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
-
-      const { data, error: usersError } = await supabase
-        .from('user')
-        .select(USER_SELECT)
-        .order('user_type', { ascending: true })
-        .order('full_name', { ascending: true })
-
-      if (usersError) throw usersError
+      const data = await getUsers();
       setUsers(data || [])
     } catch (err) {
       setError(err.message || 'Unable to load users.')
@@ -53,6 +48,7 @@ function UserManagement() {
     loadUsers()
   }, [loadUsers])
 
+  // Search Logic
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase()
     if (!term) return users
@@ -70,6 +66,7 @@ function UserManagement() {
     )
   }, [search, users])
 
+  // Stats Logic
   const stats = useMemo(() => {
     const active = users.filter((user) => normalizeStatus(user.record_status) === 'ACTIVE').length
     const inactive = users.filter((user) => normalizeStatus(user.record_status) !== 'ACTIVE').length
@@ -78,22 +75,26 @@ function UserManagement() {
     return { active, inactive, protectedCount, total: users.length }
   }, [users])
 
+  // PR-01: Update User Status (Activate/Deactivate)
   const updateUserStatus = async (user, nextStatus) => {
-    if (user.user_type === 'SUPERADMIN') return
+    // Safety check: Block SuperAdmin modification at UI level
+    if (user.user_type === 'SUPERADMIN') {
+      setError("SUPERADMIN accounts are protected and cannot be modified.")
+      return
+    }
 
     try {
       setActionUserId(user.userId)
       setError('')
       setNotice('')
 
-      const { error: updateError } = await supabase
-        .from('user')
-        .update({ record_status: nextStatus })
-        .eq('userId', user.userId)
-        .neq('user_type', 'SUPERADMIN')
+      if (nextStatus === 'ACTIVE') {
+        await activateUser(user.userId)
+      } else {
+        await deactivateUser(user.userId)
+      }
 
-      if (updateError) throw updateError
-
+      // Update local state instead of full re-fetch for better UX
       setUsers((currentUsers) =>
         currentUsers.map((currentUser) =>
           currentUser.userId === user.userId
@@ -103,7 +104,7 @@ function UserManagement() {
       )
       setNotice(`${user.full_name || user.email} is now ${nextStatus.toLowerCase()}.`)
     } catch (err) {
-      setError(err.message || 'Unable to update this user.')
+      setError(err.message || 'Update failed: You may not have permission.')
     } finally {
       setActionUserId(null)
     }
@@ -123,6 +124,7 @@ function UserManagement() {
           flex-direction: column;
           gap: 18px;
           min-height: 100%;
+          padding: 20px;
         }
 
         .admin-users-header {
@@ -158,7 +160,6 @@ function UserManagement() {
           font-size: 20px;
           font-weight: 850;
           line-height: 1;
-          letter-spacing: 0;
         }
 
         .admin-subtitle {
@@ -176,18 +177,6 @@ function UserManagement() {
           border: 1px solid rgba(100, 160, 255, 0.1);
           border-radius: 10px;
           padding: 8px 12px;
-          transition: all 0.2s ease;
-        }
-
-        .admin-search:focus-within {
-          border-color: rgba(100, 160, 255, 0.3);
-          background: rgba(100, 160, 255, 0.07);
-          box-shadow: 0 0 0 3px rgba(60, 120, 255, 0.08);
-        }
-
-        .admin-search svg {
-          color: rgba(180, 210, 255, 0.28);
-          flex-shrink: 0;
         }
 
         .admin-search input {
@@ -199,22 +188,16 @@ function UserManagement() {
           font-size: 12.5px;
         }
 
-        .admin-search input::placeholder {
-          color: rgba(180, 210, 255, 0.24);
-        }
-
         .admin-stat-grid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 12px;
         }
 
-        .admin-stat-card,
-        .admin-table-card {
+        .admin-stat-card, .admin-table-card {
           background: rgba(8, 18, 40, 0.62);
           border: 1px solid rgba(100, 160, 255, 0.1);
           border-radius: 16px;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
 
         .admin-stat-card {
@@ -222,7 +205,6 @@ function UserManagement() {
           align-items: center;
           gap: 10px;
           padding: 14px;
-          min-width: 0;
         }
 
         .admin-stat-icon {
@@ -232,7 +214,6 @@ function UserManagement() {
           display: flex;
           align-items: center;
           justify-content: center;
-          flex-shrink: 0;
           color: rgba(147, 197, 253, 0.95);
           background: rgba(59, 130, 246, 0.1);
           border: 1px solid rgba(147, 197, 253, 0.16);
@@ -240,20 +221,16 @@ function UserManagement() {
 
         .admin-stat-label {
           display: block;
-          margin-bottom: 4px;
           color: rgba(180, 210, 255, 0.34);
           font-size: 9px;
           font-weight: 850;
-          letter-spacing: 0.12em;
           text-transform: uppercase;
         }
 
         .admin-stat-value {
-          display: block;
           color: rgba(245, 250, 255, 0.94);
           font-size: 18px;
           font-weight: 850;
-          line-height: 1;
         }
 
         .admin-feedback {
@@ -278,13 +255,8 @@ function UserManagement() {
           overflow: hidden;
         }
 
-        .admin-table-scroll {
-          overflow-x: auto;
-        }
-
         .admin-users-table {
           width: 100%;
-          min-width: 880px;
           border-collapse: collapse;
         }
 
@@ -292,195 +264,80 @@ function UserManagement() {
           padding: 12px 16px;
           text-align: left;
           font-size: 10px;
-          font-weight: 800;
           color: rgba(180, 210, 255, 0.38);
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          white-space: nowrap;
           background: rgba(100, 160, 255, 0.03);
           border-bottom: 1px solid rgba(100, 160, 255, 0.08);
+          text-transform: uppercase;
         }
 
         .admin-users-table td {
           padding: 13px 16px;
           font-size: 12.5px;
-          color: rgba(180, 210, 255, 0.68);
           border-bottom: 1px solid rgba(100, 160, 255, 0.05);
-          vertical-align: middle;
         }
 
-        .admin-users-table tbody tr:last-child td {
-          border-bottom: none;
-        }
-
-        .admin-users-table tbody tr:hover {
-          background: rgba(100, 160, 255, 0.06);
-        }
-
-        .admin-user-id {
-          max-width: 180px;
-          color: rgba(180, 210, 255, 0.46) !important;
-          font-family: monospace;
-          font-size: 11.5px !important;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .admin-user-name {
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          min-width: 0;
-        }
-
-        .admin-user-name strong {
-          color: rgba(235, 245, 255, 0.92);
-          font-size: 13px;
-        }
-
-        .admin-user-name span {
-          color: rgba(180, 210, 255, 0.38);
-          font-size: 11.5px;
-        }
-
-        .admin-role-badge,
-        .admin-status-badge {
+        .admin-role-badge, .admin-status-badge {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          min-height: 26px;
-          padding: 0 9px;
+          padding: 2px 10px;
           border-radius: 999px;
-          border: 1px solid rgba(100, 160, 255, 0.14);
           font-size: 10.5px;
           font-weight: 850;
-          letter-spacing: 0.05em;
           text-transform: uppercase;
-          white-space: nowrap;
         }
 
-        .admin-role-badge.superadmin {
-          color: rgba(252, 211, 77, 0.96);
-          background: rgba(245, 158, 11, 0.1);
-          border-color: rgba(252, 211, 77, 0.18);
-        }
+        .admin-role-badge.superadmin { color: #fcd34d; background: rgba(245, 158, 11, 0.1); }
+        .admin-role-badge.admin { color: #93c5fd; background: rgba(59, 130, 246, 0.1); }
+        .admin-role-badge.user { color: #c4b5fd; background: rgba(139, 92, 246, 0.1); }
 
-        .admin-role-badge.admin {
-          color: rgba(147, 197, 253, 0.96);
-          background: rgba(59, 130, 246, 0.1);
-          border-color: rgba(147, 197, 253, 0.18);
-        }
-
-        .admin-role-badge.user {
-          color: rgba(196, 181, 253, 0.96);
-          background: rgba(139, 92, 246, 0.1);
-          border-color: rgba(196, 181, 253, 0.18);
-        }
-
-        .admin-status-badge.active {
-          color: rgba(134, 239, 172, 0.95);
-          background: rgba(34, 197, 94, 0.08);
-          border-color: rgba(34, 197, 94, 0.18);
-        }
-
-        .admin-status-badge.inactive {
-          color: rgba(252, 165, 165, 0.95);
-          background: rgba(239, 68, 68, 0.08);
-          border-color: rgba(248, 113, 113, 0.18);
-        }
-
-        .admin-action-group {
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          flex-wrap: wrap;
-        }
+        .admin-status-badge.active { color: #86efac; background: rgba(34, 197, 94, 0.1); }
+        .admin-status-badge.inactive { color: #fca5a5; background: rgba(239, 68, 68, 0.1); }
 
         .admin-action-btn {
-          min-height: 32px;
           display: inline-flex;
           align-items: center;
-          justify-content: center;
           gap: 7px;
-          border-radius: 9px;
-          border: 1px solid rgba(100, 160, 255, 0.12);
-          padding: 0 11px;
-          background: rgba(100, 160, 255, 0.06);
-          color: rgba(190, 215, 255, 0.82);
+          border-radius: 8px;
+          padding: 6px 12px;
           font-size: 12px;
           font-weight: 800;
           cursor: pointer;
-          transition: all 0.18s ease;
-          white-space: nowrap;
+          transition: 0.2s;
+          border: 1px solid transparent;
         }
 
         .admin-action-btn.activate {
-          color: rgba(134, 239, 172, 0.95);
+          color: #86efac;
           background: rgba(34, 197, 94, 0.08);
           border-color: rgba(34, 197, 94, 0.18);
         }
 
         .admin-action-btn.deactivate {
-          color: rgba(252, 165, 165, 0.95);
+          color: #fca5a5;
           background: rgba(239, 68, 68, 0.08);
           border-color: rgba(248, 113, 113, 0.18);
         }
 
-        .admin-action-btn:hover:not(:disabled) {
-          transform: translateY(-1px);
-          filter: brightness(1.1);
-        }
-
-        .admin-action-btn:disabled {
-          opacity: 0.52;
-          cursor: not-allowed;
-          transform: none;
-        }
+        .admin-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .admin-protected-note {
-          display: inline-flex;
+          color: #fcd34d;
+          font-size: 11px;
+          display: flex;
           align-items: center;
-          gap: 6px;
-          color: rgba(252, 211, 77, 0.76);
-          font-size: 11.5px;
-          font-weight: 700;
-          white-space: nowrap;
-        }
-
-        .admin-empty {
-          padding: 48px 16px;
-          text-align: center;
-          color: rgba(180, 210, 255, 0.32);
-          font-size: 13px;
-        }
-
-        @media (max-width: 980px) {
-          .admin-stat-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-        }
-
-        @media (max-width: 720px) {
-          .admin-search {
-            min-width: 100%;
-          }
-
-          .admin-stat-grid {
-            grid-template-columns: 1fr;
-          }
+          gap: 5px;
+          opacity: 0.8;
         }
       `}</style>
 
       <div className="admin-users-page">
         <div className="admin-users-header">
           <div className="admin-title-wrap">
-            <div className="admin-title-icon">
-              <UserCog size={20} />
-            </div>
+            <div className="admin-title-icon"><UserCog size={20} /></div>
             <div>
               <h1 className="admin-title">User Management</h1>
-              <p className="admin-subtitle">Activate and deactivate CMS accounts with SUPERADMIN protection.</p>
+              <p className="admin-subtitle">Securely manage CMS access and account status.</p>
             </div>
           </div>
 
@@ -488,40 +345,28 @@ function UserManagement() {
             <Search size={14} />
             <input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search users, emails, roles..."
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, email, or role..."
             />
           </div>
         </div>
 
-        <section className="admin-stat-grid" aria-label="User account summary">
+        <section className="admin-stat-grid">
           <div className="admin-stat-card">
             <div className="admin-stat-icon"><UserCog size={17} /></div>
-            <div>
-              <span className="admin-stat-label">Total Users</span>
-              <span className="admin-stat-value">{stats.total}</span>
-            </div>
+            <div><span className="admin-stat-label">Total</span><span className="admin-stat-value">{stats.total}</span></div>
           </div>
           <div className="admin-stat-card">
             <div className="admin-stat-icon"><CheckCircle2 size={17} /></div>
-            <div>
-              <span className="admin-stat-label">Active</span>
-              <span className="admin-stat-value">{stats.active}</span>
-            </div>
+            <div><span className="admin-stat-label">Active</span><span className="admin-stat-value">{stats.active}</span></div>
           </div>
           <div className="admin-stat-card">
             <div className="admin-stat-icon"><XCircle size={17} /></div>
-            <div>
-              <span className="admin-stat-label">Inactive</span>
-              <span className="admin-stat-value">{stats.inactive}</span>
-            </div>
+            <div><span className="admin-stat-label">Inactive</span><span className="admin-stat-value">{stats.inactive}</span></div>
           </div>
           <div className="admin-stat-card">
             <div className="admin-stat-icon"><ShieldCheck size={17} /></div>
-            <div>
-              <span className="admin-stat-label">Protected</span>
-              <span className="admin-stat-value">{stats.protectedCount}</span>
-            </div>
+            <div><span className="admin-stat-label">Protected</span><span className="admin-stat-value">{stats.protectedCount}</span></div>
           </div>
         </section>
 
@@ -530,80 +375,62 @@ function UserManagement() {
 
         <section className="admin-table-card">
           {loading ? (
-            <div className="admin-empty">
-              <Loader2 className="animate-spin mb-3 mx-auto text-blue-400" size={28} />
-              <p>Loading user accounts...</p>
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="admin-empty">No users found.</div>
+            <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto text-blue-400" size={32} /></div>
           ) : (
-            <div className="admin-table-scroll">
+            <div className="overflow-x-auto">
               <table className="admin-users-table">
                 <thead>
                   <tr>
-                    <th>User ID</th>
-                    <th>Username</th>
-                    <th>User Type</th>
+                    <th>Full Name / Email</th>
+                    <th>Role</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.map((user) => {
-                    const isSuperadmin = user.user_type === 'SUPERADMIN'
+                    const isSuper = user.user_type === 'SUPERADMIN'
                     const isActive = normalizeStatus(user.record_status) === 'ACTIVE'
                     const isUpdating = actionUserId === user.userId
-                    const statusTone = getStatusTone(user.record_status)
-                    const roleTone = String(user.user_type || 'USER').toLowerCase()
 
                     return (
                       <tr key={user.userId}>
-                        <td className="admin-user-id" title={user.userId}>{user.userId}</td>
                         <td>
-                          <div className="admin-user-name">
-                            <strong>{user.full_name || 'Unnamed User'}</strong>
-                            <span>{user.email || 'No email on file'}</span>
+                          <div className="flex flex-col">
+                            <strong className="text-white">{user.full_name || 'No Name'}</strong>
+                            <span className="text-blue-200/40 text-xs">{user.email}</span>
                           </div>
                         </td>
                         <td>
-                          <span className={`admin-role-badge ${roleTone}`}>
-                            {isSuperadmin ? <ShieldCheck size={12} /> : <UserCog size={12} />}
-                            {user.user_type || 'USER'}
+                          <span className={`admin-role-badge ${String(user.user_type).toLowerCase()}`}>
+                            {isSuper ? <ShieldCheck size={10} /> : <UserCog size={10} />}
+                            {user.user_type}
                           </span>
                         </td>
                         <td>
-                          <span className={`admin-status-badge ${statusTone}`}>
-                            {isActive ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-                            {normalizeStatus(user.record_status) || 'INACTIVE'}
+                          <span className={`admin-status-badge ${isActive ? 'active' : 'inactive'}`}>
+                            {user.record_status}
                           </span>
                         </td>
                         <td>
-                          {isSuperadmin ? (
-                            <span
-                              className="admin-protected-note"
-                              title="SUPERADMIN accounts cannot be modified"
-                            >
-                              <Lock size={13} />
-                              SUPERADMIN accounts cannot be modified
-                            </span>
+                          {isSuper ? (
+                            <span className="admin-protected-note"><Lock size={12} /> System Protected</span>
                           ) : (
-                            <div className="admin-action-group">
+                            <div className="flex gap-2">
                               <button
                                 className="admin-action-btn activate"
-                                type="button"
                                 disabled={isActive || isUpdating}
                                 onClick={() => updateUserStatus(user, 'ACTIVE')}
                               >
-                                {isUpdating ? <Loader2 className="animate-spin" size={13} /> : <CheckCircle2 size={13} />}
+                                {isUpdating && actionUserId === user.userId ? <Loader2 className="animate-spin" size={12} /> : <CheckCircle2 size={12} />}
                                 Activate
                               </button>
                               <button
                                 className="admin-action-btn deactivate"
-                                type="button"
                                 disabled={!isActive || isUpdating}
                                 onClick={() => updateUserStatus(user, 'INACTIVE')}
                               >
-                                {isUpdating ? <Loader2 className="animate-spin" size={13} /> : <Power size={13} />}
+                                {isUpdating && actionUserId === user.userId ? <Loader2 className="animate-spin" size={12} /> : <Power size={12} />}
                                 Deactivate
                               </button>
                             </div>
