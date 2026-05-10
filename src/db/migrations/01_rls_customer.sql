@@ -37,16 +37,23 @@ WITH CHECK (
 );
 
 -- UPDATE POLICY
--- SUPERADMIN: Full control (Edit + Soft-Delete).
--- ADMIN: Edit only (CUST_EDIT=1), but BLOCKED if trying to set INACTIVE (CUST_DEL=0).
--- USER: Blocked (rights are 0).
+-- SUPERADMIN: Edit/recover with CUST_EDIT and soft-delete with CUST_DEL.
+-- ADMIN: Edit/recover ACTIVE rows with CUST_EDIT, but cannot set records to INACTIVE.
+-- USER: Blocked.
 DROP POLICY IF EXISTS "customer_update_policy" ON customer;
 CREATE POLICY "customer_update_policy" ON customer FOR UPDATE TO authenticated
-USING (true)
+USING (
+  (SELECT user_type FROM "user" WHERE "userId"::text = auth.uid()::text) IN ('ADMIN', 'SUPERADMIN')
+  AND (check_cms_right('CUST_EDIT') OR check_cms_right('CUST_DEL'))
+)
 WITH CHECK (
   -- SUPERADMIN Logic
   ((SELECT user_type FROM "user" WHERE "userId"::text = auth.uid()::text) = 'SUPERADMIN' 
-    AND check_cms_right('CUST_EDIT'))
+    AND (
+      (record_status = 'INACTIVE' AND check_cms_right('CUST_DEL'))
+      OR
+      (record_status = 'ACTIVE' AND check_cms_right('CUST_EDIT'))
+    ))
   
   OR 
   

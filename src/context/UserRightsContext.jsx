@@ -2,7 +2,21 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabase/supabaseClient';
 import { useAuth } from './useAuth';
 import { UserRightsContext } from './rightsContext';
-import { DEFAULT_RIGHTS } from '../utils/accessRules';
+import { DEFAULT_RIGHTS, REQUIRED_RIGHTS } from '../utils/accessRules';
+
+const normalizeRightValue = (value) => (value === 1 || value === true || value === '1' ? 1 : 0);
+
+const buildRightsMap = (rows = []) => {
+  const rightsMap = { ...DEFAULT_RIGHTS };
+
+  rows.forEach((row) => {
+    if (REQUIRED_RIGHTS.includes(row.right_id)) {
+      rightsMap[row.right_id] = normalizeRightValue(row.is_allowed);
+    }
+  });
+
+  return rightsMap;
+};
 
 export const UserRightsProvider = ({ children }) => {
   const { user } = useAuth();
@@ -20,36 +34,41 @@ export const UserRightsProvider = ({ children }) => {
 
     const fetchRights = async () => {
       setRightsLoading(true);
+      setRights(DEFAULT_RIGHTS);
+      setUserType(user.user_type ?? null);
+
       try {
-        // 1. Fetches user metadata (Uses 'userId' to match your Auth table)
+        const authUserId = user.userId ?? user.id;
+
+        if (!authUserId) {
+          setRightsLoading(false);
+          return;
+        }
+
         const { data: userData, error: userError } = await supabase
           .from('user')
           .select('userId, user_type')
-          .eq('email', user.email)
-          .single();
+          .eq('userId', authUserId)
+          .maybeSingle();
 
         if (userError || !userData) {
           setRightsLoading(false);
           return;
         }
 
-        setUserType(userData.user_type);
+        setUserType(userData.user_type ?? user.user_type ?? 'USER');
 
-        // 2. Fetches rights (Uses the specific table name that worked for you)
-        const { data: rightsData } = await supabase
+        const { data: rightsData, error: rightsError } = await supabase
           .from('usermodule_rights')
           .select('right_id, is_allowed')
           .eq('userId', userData.userId);
 
-        if (rightsData) {
-          const rightsMap = {};
-          rightsData.forEach(row => {
-            rightsMap[row.right_id] = row.is_allowed;
-          });
-          setRights(prev => ({ ...prev, ...rightsMap }));
-        }
+        if (rightsError) throw rightsError;
+
+        setRights(buildRightsMap(rightsData));
       } catch {
-        // Errors are caught silently for a cleaner production UI
+        setRights(DEFAULT_RIGHTS);
+        setUserType(user.user_type ?? null);
       } finally {
         setRightsLoading(false);
       }
