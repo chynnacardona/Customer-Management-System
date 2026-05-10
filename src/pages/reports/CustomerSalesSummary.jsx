@@ -19,9 +19,11 @@ function CustomerSalesSummary() {
       try {
         setLoading(true)
         setError('')
+        // Wired to your API which sorts by spend descending
         const data = await getCustomerSalesSummary()
-        setRows(data)
+        setRows(data || [])
       } catch (err) {
+        console.error('Report Load Error:', err)
         setError(err.message || 'Unable to load customer sales summary.')
       } finally {
         setLoading(false)
@@ -40,25 +42,27 @@ function CustomerSalesSummary() {
         row.custno,
         row.custname,
         row.payterm,
-        getReportValue(row, 'record_status', 'recordStatus'),
+        // Checks both record_status and recordStatus
+        getReportValue(row, 'recordStatus', 'record_status'),
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term))
     )
   }, [rows, search])
 
-  const stats = useMemo(() => {
-    const totalSpend = rows.reduce(
-      (sum, row) => sum + Number(getReportValue(row, 'totalSpend', 'totalspend') || 0),
-      0
-    )
-    const totalTransactions = rows.reduce(
-      (sum, row) => sum + Number(getReportValue(row, 'totalTransactions', 'totaltransactions') || 0),
-      0
-    )
+ const stats = useMemo(() => {
+  // UPDATED: Look for 'total_spent' and 'total_transactions'
+  const totalSpend = rows.reduce(
+    (sum, row) => sum + Number(getReportValue(row, 'totalSpend', 'total_spent') || 0),
+    0
+  )
+  const totalTransactions = rows.reduce(
+    (sum, row) => sum + Number(getReportValue(row, 'totalTransactions', 'total_transactions') || 0),
+    0
+  )
 
-    return { totalCustomers: rows.length, totalSpend, totalTransactions }
-  }, [rows])
+  return { totalCustomers: rows.length, totalSpend, totalTransactions }
+}, [rows])
 
   return (
     <div className="reports-page">
@@ -129,8 +133,9 @@ function CustomerSalesSummary() {
               </thead>
               <tbody>
                 {filteredRows.map((row) => {
-                  const totalTransactions = getReportValue(row, 'totalTransactions', 'totaltransactions') || 0
-                  const totalSpend = getReportValue(row, 'totalSpend', 'totalspend') || 0
+                  // Ensure we use the helper for every numeric/date field coming from SQL
+                  const tTransactions = getReportValue(row, 'totalTransactions', 'total_transactions') || 0
+                  const tSpend = getReportValue(row, 'totalSpend', 'total_spent') || 0
                   const lastSaleDate = getReportValue(row, 'lastSaleDate', 'lastsaledate')
 
                   return (
@@ -142,8 +147,8 @@ function CustomerSalesSummary() {
                         <div className="reports-code-cell">{row.custno}</div>
                       </td>
                       <td>{row.payterm || '-'}</td>
-                      <td>{Number(totalTransactions).toLocaleString()}</td>
-                      <td className="reports-money-cell">{formatCurrency(totalSpend)}</td>
+                      <td>{Number(tTransactions).toLocaleString()}</td>
+                      <td className="reports-money-cell">{formatCurrency(tSpend)}</td>
                       <td className="reports-date-cell">{lastSaleDate || '-'}</td>
                     </tr>
                   )

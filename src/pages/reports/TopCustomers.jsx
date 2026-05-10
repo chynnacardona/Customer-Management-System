@@ -32,15 +32,15 @@ function TopCustomers() {
 
   const stats = useMemo(() => {
     const totalSpend = rows.reduce(
-      (sum, row) => sum + Number(getReportValue(row, 'totalSpend', 'totalspend') || 0),
+      (sum, row) => sum + Number(getReportValue(row, 'total_spent', 'total_spent') || 0),
       0
     )
     const totalTransactions = rows.reduce(
-      (sum, row) => sum + Number(getReportValue(row, 'totalTransactions', 'totaltransactions') || 0),
+      (sum, row) => sum + Number(getReportValue(row, 'total_transactions', 'total_transactions') || 0),
       0
     )
     const topSpend = Math.max(
-      ...rows.map((row) => Number(getReportValue(row, 'totalSpend', 'totalspend') || 0)),
+      ...rows.map((row) => Number(getReportValue(row, 'total_spent', 'total_spent') || 0)),
       0
     )
 
@@ -96,8 +96,9 @@ function TopCustomers() {
         ) : (
           <div className="leaderboard-list">
             {rows.map((row, index) => {
-              const totalSpend = Number(getReportValue(row, 'totalSpend', 'totalspend') || 0)
-              const totalTransactions = Number(getReportValue(row, 'totalTransactions', 'totaltransactions') || 0)
+              // Change 'totalspend' and 'totaltransactions' to the underscored versions
+              const totalSpend = Number(getReportValue(row, 'total_spent', 'total_spent') || 0)
+              const totalTransactions = Number(getReportValue(row, 'total_transactions', 'total_transactions') || 0)
               const width = stats.topSpend > 0 ? Math.max((totalSpend / stats.topSpend) * 100, 3) : 0
 
               return (

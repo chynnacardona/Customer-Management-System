@@ -6,16 +6,26 @@ const moneyFormatter = new Intl.NumberFormat('en-PH', {
   maximumFractionDigits: 2,
 })
 
+/**
+ * Formats a number into Philippine Peso (PHP)
+ */
 export const formatCurrency = (value) => moneyFormatter.format(Number(value || 0))
 
+/**
+ * UTILITY: Checks multiple possible key names (camelCase vs snake_case)
+ * and returns the first one that exists.
+ */
 export const getReportValue = (row, ...keys) => {
   for (const key of keys) {
     if (row?.[key] !== undefined && row?.[key] !== null) return row[key]
   }
-
   return null
 }
 
+/**
+ * PR-01: Fetches the Customer Sales Summary view.
+ * Logic: Fetches all, then sorts by spend (Highest to Lowest).
+ */
 export async function getCustomerSalesSummary() {
   const { data, error } = await supabase
     .from('customer_sales_summary')
@@ -24,19 +34,31 @@ export async function getCustomerSalesSummary() {
   if (error) throw error
 
   return [...(data || [])].sort((a, b) => {
-    const spendA = Number(getReportValue(a, 'totalSpend', 'totalspend') || 0)
-    const spendB = Number(getReportValue(b, 'totalSpend', 'totalspend') || 0)
+    // UPDATED: Added 'total_spent' to the search keys
+    const spendA = Number(getReportValue(a, 'totalSpend', 'total_spent') || 0)
+    const spendB = Number(getReportValue(b, 'totalSpend', 'total_spent') || 0)
     return spendB - spendA
   })
 }
 
+/**
+ * Filters the Summary to show only the highest-spending customers.
+ */
 export async function getTopCustomers(limit = 10) {
-  const rows = await getCustomerSalesSummary()
+  const rows = await getCustomerSalesSummary();
+  
   return rows
-    .filter((row) => Number(getReportValue(row, 'totalSpend', 'totalspend') || 0) > 0)
-    .slice(0, limit)
+    .filter((row) => {
+      const spend = Number(getReportValue(row, 'totalSpend', 'total_spent') || 0);
+      return spend > 0;
+    })
+    .slice(0, limit);
 }
 
+/**
+ * PR-01: Fetches the Product Revenue view.
+ * Logic: Fetches all products and sorts by revenue (Highest to Lowest).
+ */
 export async function getProductRevenue() {
   const { data, error } = await supabase
     .from('product_revenue')
@@ -45,8 +67,9 @@ export async function getProductRevenue() {
   if (error) throw error
 
   return [...(data || [])].sort((a, b) => {
-    const revenueA = Number(getReportValue(a, 'totalRevenue', 'totalrevenue') || 0)
-    const revenueB = Number(getReportValue(b, 'totalRevenue', 'totalrevenue') || 0)
+    // Handles database 'totalrevenue' vs possible 'totalRevenue'
+    const revenueA = Number(getReportValue(a, 'totalRevenue', 'total_revenue') || 0)
+    const revenueB = Number(getReportValue(b, 'totalRevenue', 'total_revenue') || 0)
     return revenueB - revenueA
   })
 }
