@@ -15,21 +15,15 @@ BEGIN
   VALUES (
     NEW.id, 
     NEW.email, 
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'username', 'New User'), 
+    COALESCE(NEW.raw_user_meta_data->>'full_name', 'New User'), 
     'USER', 
-    'INACTIVE'
-  )
-  ON CONFLICT (email) DO UPDATE SET
-    "userId" = EXCLUDED."userId",
-    full_name = EXCLUDED.full_name,
-    user_type = COALESCE(public."user".user_type, EXCLUDED.user_type),
-    record_status = 'INACTIVE';
+    'INACTIVE' -- As per Section 4.1: pending admin activation
+  );
 
   -- B. YOUR SCRIPT: Link the new user to all 4 Modules in user_module
   INSERT INTO public.user_module ("userId", module_id)
   SELECT NEW.id, m.module_id 
-  FROM public.Module m
-  ON CONFLICT ("userId", module_id) DO NOTHING;
+  FROM public.Module m;
 
   -- C. YOUR SCRIPT: Map the 9 Rights (Default VIEW rights for new users)
   -- Based on Screenshot 4.1: VIEW rights = 1, others = 0
@@ -48,8 +42,7 @@ BEGIN
   WHERE (m.module_id = 'Cust_Mod' AND r.right_id LIKE 'CUST%')
      OR (m.module_id = 'Sales_Mod' AND r.right_id IN ('SALES_VIEW', 'SD_VIEW'))
      OR (m.module_id = 'Prod_Mod' AND r.right_id IN ('PROD_VIEW', 'PRICE_VIEW'))
-     OR (m.module_id = 'Adm_Mod' AND r.right_id = 'ADM_USER')
-  ON CONFLICT ("userId", module_id, right_id) DO NOTHING;
+     OR (m.module_id = 'Adm_Mod' AND r.right_id = 'ADM_USER');
 
   RETURN NEW;
 END;
