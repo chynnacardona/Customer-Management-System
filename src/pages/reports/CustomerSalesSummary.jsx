@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BarChart3, Loader2, Search, ShoppingCart, Users, Wallet } from 'lucide-react'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import {
-  formatCurrency,
   getCustomerSalesSummary,
   getReportValue,
 } from '../../services/reportsApi'
+import { useCurrencyFormatter } from '../../utils/currency'
 import './Reports.css'
 
 function CustomerSalesSummary() {
+  const { formatCurrency } = useCurrencyFormatter()
   const [rows, setRows] = useState([])
   const [search, setSearch] = useState('')
+  const [salesFilter, setSalesFilter] = useState('ALL')
+  const [sortFilter, setSortFilter] = useState('SPEND_DESC')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -35,20 +39,35 @@ function CustomerSalesSummary() {
 
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return rows
 
-    return rows.filter((row) =>
-      [
-        row.custno,
-        row.custname,
-        row.payterm,
-        // Checks both record_status and recordStatus
-        getReportValue(row, 'recordStatus', 'record_status'),
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-    )
-  }, [rows, search])
+    const filtered = rows.filter((row) => {
+      const transactions = Number(getReportValue(row, 'totalTransactions', 'totaltransactions') || 0)
+      const matchesSearch =
+        !term ||
+        [
+          row.custno,
+          row.custname,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(term))
+      const matchesSales =
+        salesFilter === 'ALL' ||
+        (salesFilter === 'WITH_SALES' && transactions > 0) ||
+        (salesFilter === 'NO_SALES' && transactions === 0)
+
+      return matchesSearch && matchesSales
+    })
+
+    return [...filtered].sort((a, b) => {
+      if (sortFilter === 'TX_DESC') {
+        return Number(getReportValue(b, 'totalTransactions', 'totaltransactions') || 0) - Number(getReportValue(a, 'totalTransactions', 'totaltransactions') || 0)
+      }
+      if (sortFilter === 'NAME_ASC') {
+        return String(a.custname || '').localeCompare(String(b.custname || ''))
+      }
+      return Number(getReportValue(b, 'totalSpend', 'totalspend') || 0) - Number(getReportValue(a, 'totalSpend', 'totalspend') || 0)
+    })
+  }, [rows, salesFilter, search, sortFilter])
 
  const stats = useMemo(() => {
   // UPDATED: Look for 'total_spent' and 'total_transactions'
@@ -71,16 +90,38 @@ function CustomerSalesSummary() {
           <div className="reports-title-icon"><BarChart3 size={20} /></div>
           <div>
             <h1 className="reports-title">Customer Sales Summary</h1>
-            <p className="reports-subtitle">Searchable summary of transactions, total spend, and last sale date.</p>
+            <p className="reports-subtitle">Searchable summary of customers, transactions, and total spend.</p>
           </div>
         </div>
 
-        <div className="reports-search">
-          <Search size={14} />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search customer, payterm, status..."
+        <div className="reports-filters">
+          <div className="reports-search">
+            <Search size={14} />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search customer..."
+            />
+          </div>
+          <FilterDropdown
+            label="Customer sales"
+            value={salesFilter}
+            onChange={setSalesFilter}
+            options={[
+              { value: 'ALL', label: 'All Customers' },
+              { value: 'WITH_SALES', label: 'With Sales' },
+              { value: 'NO_SALES', label: 'No Sales' },
+            ]}
+          />
+          <FilterDropdown
+            label="Sort"
+            value={sortFilter}
+            onChange={setSortFilter}
+            options={[
+              { value: 'SPEND_DESC', label: 'Spend High-Low' },
+              { value: 'TX_DESC', label: 'Transactions High-Low' },
+              { value: 'NAME_ASC', label: 'Name A-Z' },
+            ]}
           />
         </div>
       </div>
@@ -125,18 +166,14 @@ function CustomerSalesSummary() {
               <thead>
                 <tr>
                   <th>Customer</th>
-                  <th>Pay Term</th>
                   <th>Transactions</th>
-                  <th>Total Spend</th>
-                  <th>Last Sale</th>
+                  <th className="reports-align-center">Total Spend</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map((row) => {
-                  // Ensure we use the helper for every numeric/date field coming from SQL
-                  const tTransactions = getReportValue(row, 'totalTransactions', 'total_transactions') || 0
-                  const tSpend = getReportValue(row, 'totalSpend', 'total_spent') || 0
-                  const lastSaleDate = getReportValue(row, 'lastSaleDate', 'lastsaledate')
+                  const totalTransactions = getReportValue(row, 'totalTransactions', 'totaltransactions') || 0
+                  const totalSpend = getReportValue(row, 'totalSpend', 'totalspend') || 0
 
                   return (
                     <tr key={row.custno || row.custname}>
@@ -150,10 +187,8 @@ function CustomerSalesSummary() {
                         )}
                         {row.custno && <div className="reports-code-cell">{row.custno}</div>}
                       </td>
-                      <td>{row.payterm || '-'}</td>
-                      <td>{Number(tTransactions).toLocaleString()}</td>
-                      <td className="reports-money-cell">{formatCurrency(tSpend)}</td>
-                      <td className="reports-date-cell">{lastSaleDate || '-'}</td>
+                      <td>{Number(totalTransactions).toLocaleString()}</td>
+                      <td className="reports-money-cell reports-align-center">{formatCurrency(totalSpend)}</td>
                     </tr>
                   )
                 })}

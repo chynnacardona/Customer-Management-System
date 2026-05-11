@@ -9,6 +9,31 @@ body {
   overflow: hidden;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(126, 184, 255, 0.45) rgba(8, 18, 40, 0.35);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(5, 16, 48, 0.68);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(46, 134, 245, 0.85), rgba(26, 79, 214, 0.92));
+  border-radius: 999px;
+  border: 2px solid rgba(5, 16, 48, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(180, 210, 255, 0.12);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.95), rgba(46, 134, 245, 0.95));
+}
+
 .dashboard-scroll-pane {
   scrollbar-width: thin;
   scrollbar-color: rgba(126, 184, 255, 0.45) rgba(8, 18, 40, 0.35);

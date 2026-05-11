@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Search, Loader2, Package, Boxes, Coins } from 'lucide-react'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import { getProducts } from '../../services/salesProductApi'
+import { useCurrencyFormatter } from '../../utils/currency'
 
 function ProductCatalog() {
+  const { formatCurrency } = useCurrencyFormatter()
   const [search, setSearch] = useState('')
+  const [unitFilter, setUnitFilter] = useState('ALL')
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -29,18 +33,20 @@ function ProductCatalog() {
   // Memoized search logic for performance
   const filteredProducts = useMemo(() => {
     const term = search.toLowerCase().trim()
-    if (!term) return products
-    return products.filter((p) =>
-      p.prodcode.toLowerCase().includes(term) ||
-      p.description.toLowerCase().includes(term)
-    )
-  }, [search, products])
+    return products.filter((product) => {
+      const matchesSearch =
+        !term ||
+        product.prodcode.toLowerCase().includes(term) ||
+        product.description.toLowerCase().includes(term)
+      const matchesUnit = unitFilter === 'ALL' || product.unit === unitFilter
 
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat('en-PH', { 
-      style: 'currency', 
-      currency: 'PHP' 
-    }).format(value)
+      return matchesSearch && matchesUnit
+    })
+  }, [search, products, unitFilter])
+
+  const unitOptions = useMemo(() => {
+    return [...new Set(products.map((product) => product.unit).filter(Boolean))].sort()
+  }, [products])
 
   return (
     <>
@@ -134,6 +140,14 @@ function ProductCatalog() {
           background: transparent;
           color: rgba(220, 235, 255, 0.86);
           font-size: 12.5px;
+        }
+
+        .product-filters {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
         }
 
         .product-stats {
@@ -363,6 +377,7 @@ function ProductCatalog() {
 
         @media (max-width: 780px) {
           .product-search { min-width: 100%; }
+          .product-filters { width: 100%; justify-content: stretch; }
           .product-stats { grid-template-columns: 1fr; }
         }
       `}</style>
@@ -377,12 +392,23 @@ function ProductCatalog() {
             </div>
           </div>
 
-          <div className="product-search">
-            <Search size={14} />
-            <input 
-              value={search} 
-              onChange={(e) => setSearch(e.target.value)} 
-              placeholder="Search products..." 
+          <div className="product-filters">
+            <div className="product-search">
+              <Search size={14} />
+              <input 
+                value={search} 
+                onChange={(e) => setSearch(e.target.value)} 
+                placeholder="Search products..." 
+              />
+            </div>
+            <FilterDropdown
+              label="Unit"
+              value={unitFilter}
+              onChange={setUnitFilter}
+              options={[
+                { value: 'ALL', label: 'All Units' },
+                ...unitOptions.map((unit) => ({ value: unit, label: unit })),
+              ]}
             />
           </div>
         </div>

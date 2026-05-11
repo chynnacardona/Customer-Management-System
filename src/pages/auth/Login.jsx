@@ -3,6 +3,11 @@ import { Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from "../../supabase/supabaseClient";
 
+const isTwoFactorEnabled = (email) => {
+  if (!email) return false
+  return window.localStorage.getItem(`hope-cms-2fa-${email.trim().toLowerCase()}`) === 'enabled'
+}
+
 function Login() {
   const canvasRef = useRef(null)
   const navigate = useNavigate()
@@ -10,6 +15,8 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [twoFactorCode, setTwoFactorCode] = useState('')
+  const [pendingTwoFactorEmail, setPendingTwoFactorEmail] = useState('')
   const [loading, setLoading] = useState(false)
   
   const [isError, setIsError] = useState(false)
@@ -54,7 +61,7 @@ function Login() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        navigate('/dashboard');
+        if (!isTwoFactorEnabled(session.user?.email)) navigate('/dashboard');
       }
     });
 
@@ -99,11 +106,57 @@ function Login() {
           setErrorMsg(authError.message)
         }
       } else if (data?.user) {
+        if (isTwoFactorEnabled(data.user.email)) {
+          await supabase.auth.signOut()
+          const normalizedEmail = data.user.email.trim().toLowerCase()
+          const { error: otpError } = await supabase.auth.signInWithOtp({
+            email: normalizedEmail,
+            options: { shouldCreateUser: false },
+          })
+
+          if (otpError) {
+            setIsError(true)
+            setErrorMsg(otpError.message)
+            return
+          }
+
+          setPendingTwoFactorEmail(normalizedEmail)
+          setPassword('')
+          setErrorMsg('A verification code was sent to your email.')
+          return
+        }
         navigate('/dashboard')
       }
     } catch {
       setIsError(true)
       setErrorMsg("An unexpected error occurred.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyTwoFactor = async (event) => {
+    event.preventDefault()
+    setLoading(true)
+    setIsError(false)
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: pendingTwoFactorEmail,
+        token: twoFactorCode.trim(),
+        type: 'email',
+      })
+
+      if (error) {
+        setIsError(true)
+        setErrorMsg(error.message)
+        return
+      }
+
+      navigate('/dashboard')
+    } catch {
+      setIsError(true)
+      setErrorMsg('Unable to verify the code.')
     } finally {
       setLoading(false)
     }
@@ -286,8 +339,8 @@ function Login() {
         <div className="absolute inset-0 z-0 pointer-events-none"
           style={{ background: 'radial-gradient(ellipse at 50% 60%, rgba(20, 60, 180, 0.12) 0%, transparent 70%)' }} />
 
-        <form 
-          onSubmit={handleLogin} 
+        <form
+          onSubmit={pendingTwoFactorEmail ? handleVerifyTwoFactor : handleLogin}
           className={`apple-card relative z-10 w-full mx-4 p-8 ${isError ? 'shake-error' : ''}`} 
           style={{ maxWidth: '380px' }}
         >
@@ -299,44 +352,63 @@ function Login() {
             </p>
           </div>
 
-          {/* Email */}
-          <div className="input-wrap mb-3">
-            <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
-              style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Email</label>
-            <input 
-              type="email" 
-              placeholder="Enter your email" 
-              className={`glow-input ${isError ? 'error-glow' : ''}`}
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setIsError(false);
-              }}
-              required
-            />
-          </div>
-
-          {/* Password */}
-          <div className="input-wrap mb-1">
-            <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
-              style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Password</label>
-            <div className="input-container">
+          {pendingTwoFactorEmail ? (
+            <div className="input-wrap mb-3">
+              <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+                style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Email Code</label>
               <input
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Enter your password"
-                className={`glow-input mb-1.5 ${isError ? 'error-glow' : ''}`}
-                value={password}
+                type="text"
+                inputMode="numeric"
+                placeholder="Enter verification code"
+                className={`glow-input ${isError ? 'error-glow' : ''}`}
+                value={twoFactorCode}
                 onChange={(e) => {
-                  setPassword(e.target.value);
-                  setIsError(false);
+                  setTwoFactorCode(e.target.value)
+                  setIsError(false)
                 }}
                 required
               />
-              <button type="button" className="toggle-btn mb-1.5" onClick={() => setShowPassword(!showPassword)}>
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="input-wrap mb-3">
+                <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+                  style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Email</label>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  className={`glow-input ${isError ? 'error-glow' : ''}`}
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setIsError(false);
+                  }}
+                  required
+                />
+              </div>
+
+              <div className="input-wrap mb-1">
+                <label className="block text-xs font-medium mb-1.5 tracking-widest uppercase"
+                  style={{ color: 'rgba(180, 210, 255, 0.38)' }}>Password</label>
+                <div className="input-container">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    className={`glow-input mb-1.5 ${isError ? 'error-glow' : ''}`}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setIsError(false);
+                    }}
+                    required
+                  />
+                  <button type="button" className="toggle-btn mb-1.5" onClick={() => setShowPassword(!showPassword)}>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
 
           {isError && (
             <div className="mb-5 text-center">
@@ -347,13 +419,23 @@ function Login() {
           )}
 
           <button type="submit" disabled={loading} className="sign-in-btn mb-3">
-            {loading ? 'Authenticating...' : 'Sign In'}
+            {loading ? 'Authenticating...' : pendingTwoFactorEmail ? 'Verify Code' : 'Sign In'}
           </button>
 
-          <button type="button" onClick={handleGoogleLogin} className="google-btn mb-4">
+          {pendingTwoFactorEmail && (
+            <button type="button" onClick={() => {
+              setPendingTwoFactorEmail('')
+              setTwoFactorCode('')
+              setErrorMsg('')
+            }} className="google-btn mb-3">
+              Back to password
+            </button>
+          )}
+
+          {!pendingTwoFactorEmail && <button type="button" onClick={handleGoogleLogin} className="google-btn mb-4">
             <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-4 h-4" />
             Sign in with Google
-          </button>
+          </button>}
 
           <div className="text-center pt-4 mt-2 border-t border-white/5">
             <p className="text-xs" style={{ color: 'rgba(180, 210, 255, 0.45)' }}>

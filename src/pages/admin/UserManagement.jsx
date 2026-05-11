@@ -9,6 +9,7 @@ import {
   UserCog,
   XCircle,
 } from 'lucide-react'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import { supabase } from '../../supabase/supabaseClient'
 import { getUsers, activateUser, deactivateUser } from '../../services/adminApi'
 
@@ -25,6 +26,8 @@ function getStatusTone(status) {
 function UserManagement() {
   const [users, setUsers] = useState([])
   const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [loading, setLoading] = useState(true)
   const [actionUserId, setActionUserId] = useState(null)
   const [error, setError] = useState('')
@@ -51,20 +54,25 @@ function UserManagement() {
   // Search Logic
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return users
 
-    return users.filter((user) =>
-      [
-        user.userId,
-        user.full_name,
-        user.email,
-        user.user_type,
-        user.record_status,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-    )
-  }, [search, users])
+    return users.filter((user) => {
+      const matchesSearch =
+        !term ||
+        [
+          user.userId,
+          user.full_name,
+          user.email,
+          user.user_type,
+          user.record_status,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(term))
+      const matchesRole = roleFilter === 'ALL' || user.user_type === roleFilter
+      const matchesStatus = statusFilter === 'ALL' || normalizeStatus(user.record_status) === statusFilter
+
+      return matchesSearch && matchesRole && matchesStatus
+    })
+  }, [roleFilter, search, statusFilter, users])
 
   // Stats Logic
   const stats = useMemo(() => {
@@ -188,6 +196,18 @@ function UserManagement() {
           font-size: 12.5px;
         }
 
+        .admin-search input::placeholder {
+          color: rgba(180, 210, 255, 0.24);
+        }
+
+        .admin-filters {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
         .admin-stat-grid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -276,11 +296,65 @@ function UserManagement() {
           border-bottom: 1px solid rgba(100, 160, 255, 0.05);
         }
 
-        .admin-role-badge, .admin-status-badge {
+        .admin-users-table th.role-col,
+        .admin-users-table td.role-col,
+        .admin-users-table th.status-col,
+        .admin-users-table td.status-col,
+        .admin-users-table th.actions-col,
+        .admin-users-table td.actions-col {
+          text-align: center;
+        }
+
+        .admin-users-table td.role-col,
+        .admin-users-table td.status-col,
+        .admin-users-table td.actions-col {
+          white-space: nowrap;
+        }
+
+        .admin-users-table tbody tr:last-child td {
+          border-bottom: none;
+        }
+
+        .admin-users-table tbody tr:hover {
+          background: rgba(100, 160, 255, 0.06);
+        }
+
+        .admin-user-id {
+          max-width: 180px;
+          color: rgba(180, 210, 255, 0.46) !important;
+          font-family: monospace;
+          font-size: 11.5px !important;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .admin-user-name {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+          min-width: 0;
+        }
+
+        .admin-user-name strong {
+          color: rgba(235, 245, 255, 0.92);
+          font-size: 13px;
+        }
+
+        .admin-user-name span {
+          color: rgba(180, 210, 255, 0.38);
+          font-size: 11.5px;
+        }
+
+        .admin-role-badge,
+        .admin-status-badge {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 6px;
-          padding: 2px 10px;
+          min-width: 106px;
+          min-height: 26px;
+          padding: 0 9px;
           border-radius: 999px;
           font-size: 10.5px;
           font-weight: 850;
@@ -291,8 +365,37 @@ function UserManagement() {
         .admin-role-badge.admin { color: #93c5fd; background: rgba(59, 130, 246, 0.1); }
         .admin-role-badge.user { color: #c4b5fd; background: rgba(139, 92, 246, 0.1); }
 
-        .admin-status-badge.active { color: #86efac; background: rgba(34, 197, 94, 0.1); }
-        .admin-status-badge.inactive { color: #fca5a5; background: rgba(239, 68, 68, 0.1); }
+        .admin-role-badge.admin {
+          color: rgba(147, 197, 253, 0.96);
+          background: rgba(59, 130, 246, 0.1);
+          border-color: rgba(147, 197, 253, 0.18);
+        }
+
+        .admin-role-badge.user {
+          color: rgba(196, 181, 253, 0.96);
+          background: rgba(139, 92, 246, 0.1);
+          border-color: rgba(196, 181, 253, 0.18);
+        }
+
+        .admin-status-badge.active {
+          color: rgba(134, 239, 172, 0.95);
+          background: rgba(34, 197, 94, 0.08);
+          border-color: rgba(34, 197, 94, 0.18);
+        }
+
+        .admin-status-badge.inactive {
+          color: rgba(252, 165, 165, 0.95);
+          background: rgba(239, 68, 68, 0.08);
+          border-color: rgba(248, 113, 113, 0.18);
+        }
+
+        .admin-action-group {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          flex-wrap: wrap;
+        }
 
         .admin-action-btn {
           display: inline-flex;
@@ -326,8 +429,41 @@ function UserManagement() {
           font-size: 11px;
           display: flex;
           align-items: center;
-          gap: 5px;
-          opacity: 0.8;
+          justify-content: center;
+          gap: 6px;
+          width: 100%;
+          color: rgba(252, 211, 77, 0.76);
+          font-size: 11.5px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .admin-empty {
+          padding: 48px 16px;
+          text-align: center;
+          color: rgba(180, 210, 255, 0.32);
+          font-size: 13px;
+        }
+
+        @media (max-width: 980px) {
+          .admin-stat-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 720px) {
+          .admin-search {
+            min-width: 100%;
+          }
+
+          .admin-filters {
+            width: 100%;
+            justify-content: stretch;
+          }
+
+          .admin-stat-grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
 
@@ -341,12 +477,35 @@ function UserManagement() {
             </div>
           </div>
 
-          <div className="admin-search">
-            <Search size={14} />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, email, or role..."
+          <div className="admin-filters">
+            <div className="admin-search">
+              <Search size={14} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search users, emails, roles..."
+              />
+            </div>
+            <FilterDropdown
+              label="Role"
+              value={roleFilter}
+              onChange={setRoleFilter}
+              options={[
+                { value: 'ALL', label: 'All Roles' },
+                { value: 'USER', label: 'USER' },
+                { value: 'ADMIN', label: 'ADMIN' },
+                { value: 'SUPERADMIN', label: 'SUPERADMIN' },
+              ]}
+            />
+            <FilterDropdown
+              label="Status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: 'ALL', label: 'All Status' },
+                { value: 'ACTIVE', label: 'Active' },
+                { value: 'INACTIVE', label: 'Inactive' },
+              ]}
             />
           </div>
         </div>
@@ -381,10 +540,11 @@ function UserManagement() {
               <table className="admin-users-table">
                 <thead>
                   <tr>
-                    <th>Full Name / Email</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th>User ID</th>
+                    <th>Username</th>
+                    <th className="role-col">User Type</th>
+                    <th className="status-col">Status</th>
+                    <th className="actions-col">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -401,20 +561,27 @@ function UserManagement() {
                             <span className="text-blue-200/40 text-xs">{user.email}</span>
                           </div>
                         </td>
-                        <td>
-                          <span className={`admin-role-badge ${String(user.user_type).toLowerCase()}`}>
-                            {isSuper ? <ShieldCheck size={10} /> : <UserCog size={10} />}
-                            {user.user_type}
+                        <td className="role-col">
+                          <span className={`admin-role-badge ${roleTone}`}>
+                            {isSuperadmin ? <ShieldCheck size={12} /> : <UserCog size={12} />}
+                            {user.user_type || 'USER'}
                           </span>
                         </td>
-                        <td>
-                          <span className={`admin-status-badge ${isActive ? 'active' : 'inactive'}`}>
-                            {user.record_status}
+                        <td className="status-col">
+                          <span className={`admin-status-badge ${statusTone}`}>
+                            {isActive ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                            {normalizeStatus(user.record_status) || 'INACTIVE'}
                           </span>
                         </td>
-                        <td>
-                          {isSuper ? (
-                            <span className="admin-protected-note"><Lock size={12} /> System Protected</span>
+                        <td className="actions-col">
+                          {isSuperadmin ? (
+                            <span
+                              className="admin-protected-note"
+                              title="SUPERADMIN accounts cannot be modified"
+                            >
+                              <Lock size={13} />
+                              SUPERADMIN accounts cannot be modified
+                            </span>
                           ) : (
                             <div className="flex gap-2">
                               <button

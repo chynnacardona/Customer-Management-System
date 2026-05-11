@@ -1,0 +1,71 @@
+<svg width="760" height="240" viewBox="0 0 760 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="760" y2="240" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2357F4"/>
+      <stop offset="0.55" stop-color="#3B5BFF"/>
+      <stop offset="1" stop-color="#8B4DFF"/>
+    </linearGradient>
+    <linearGradient id="platform" x1="250" y1="58" x2="430" y2="170" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EAF7FF"/>
+      <stop offset="1" stop-color="#94B5FF"/>
+    </linearGradient>
+    <linearGradient id="side" x1="252" y1="150" x2="440" y2="214" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2F68FF"/>
+      <stop offset="1" stop-color="#8F42FF"/>
+    </linearGradient>
+    <linearGradient id="card" x1="364" y1="22" x2="502" y2="138" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#BBD4FF"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#071A55" flood-opacity="0.26"/>
+    </filter>
+  </defs>
+  <rect width="760" height="240" fill="url(#bg)"/>
+  <g opacity="0.18">
+    <path d="M78 91L157 48L236 91L157 134L78 91Z" fill="#89E7FF"/>
+    <path d="M600 74L696 22L792 74L696 126L600 74Z" fill="#89E7FF"/>
+    <path d="M520 176L618 122L716 176L618 230L520 176Z" fill="#25E0B8"/>
+  </g>
+  <g opacity="0.75">
+    <path d="M72 182L104 164L136 182L104 200L72 182Z" fill="#31D8FF"/>
+    <path d="M72 182V205L104 223V200L72 182Z" fill="#2457F2"/>
+    <path d="M104 200L136 182V205L104 223V200Z" fill="#7A4DFF"/>
+    <path d="M626 34L650 21L674 34L650 47L626 34Z" fill="#31D8FF"/>
+    <path d="M626 34V53L650 67V47L626 34Z" fill="#2457F2"/>
+    <path d="M650 47L674 34V53L650 67V47Z" fill="#7A4DFF"/>
+  </g>
+  <g filter="url(#softShadow)">
+    <path d="M220 128L354 54L488 128L354 202L220 128Z" fill="url(#platform)"/>
+    <path d="M220 128V158L354 232V202L220 128Z" fill="#275CF2"/>
+    <path d="M354 202L488 128V158L354 232V202Z" fill="url(#side)"/>
+    <path d="M220 128L354 54L488 128L354 202L220 128Z" stroke="white" stroke-opacity="0.48"/>
+  </g>
+  <g filter="url(#softShadow)">
+    <path d="M356 46L466 12L548 58L438 94L356 46Z" fill="url(#card)"/>
+    <path d="M438 94V144L356 96V46L438 94Z" fill="#DCEAFF"/>
+    <path d="M438 94L548 58V108L438 144V94Z" fill="#9DBBFF"/>
+    <path d="M393 54L461 33" stroke="#5D83FF" stroke-width="5" stroke-linecap="round"/>
+    <path d="M405 70L492 43" stroke="#86A7FF" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="510" cy="43" r="14" fill="#FFD35A"/>
+    <circle cx="510" cy="43" r="21" stroke="#FFD35A" stroke-opacity="0.26" stroke-width="6"/>
+  </g>
+  <g>
+    <circle cx="328" cy="126" r="8" fill="#10204A"/>
+    <path d="M328 134V162" stroke="#10204A" stroke-width="5" stroke-linecap="round"/>
+    <path d="M328 144L311 156" stroke="#10204A" stroke-width="5" stroke-linecap="round"/>
+    <path d="M328 144L345 156" stroke="#10204A" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="380" cy="126" r="8" fill="#10204A"/>
+    <path d="M380 134V162" stroke="#10204A" stroke-width="5" stroke-linecap="round"/>
+    <path d="M380 144L363 156" stroke="#10204A" stroke-width="5" stroke-linecap="round"/>
+    <path d="M380 144L397 156" stroke="#10204A" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <g opacity="0.9">
+    <rect x="126" y="138" width="9" height="52" rx="4.5" fill="#FFE45F"/>
+    <rect x="151" y="80" width="9" height="38" rx="4.5" fill="#71F5FF"/>
+    <rect x="594" y="130" width="9" height="46" rx="4.5" fill="#FFE45F"/>
+    <ellipse cx="650" cy="156" rx="22" ry="7" fill="#FFD35A"/>
+    <ellipse cx="650" cy="148" rx="22" ry="7" fill="#FFE98C"/>
+    <ellipse cx="650" cy="140" rx="22" ry="7" fill="#FFD35A"/>
+  </g>
+</svg>

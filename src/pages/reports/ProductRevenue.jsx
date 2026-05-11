@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Package, Search, ShoppingCart, Wallet } from 'lucide-react'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import {
-  formatCurrency,
   getProductRevenue,
   getReportValue,
 } from '../../services/reportsApi'
+import { useCurrencyFormatter } from '../../utils/currency'
 import './Reports.css'
 
 function ProductRevenue() {
+  const { formatCurrency } = useCurrencyFormatter()
   const [rows, setRows] = useState([])
   const [search, setSearch] = useState('')
+  const [unitFilter, setUnitFilter] = useState('ALL')
+  const [revenueFilter, setRevenueFilter] = useState('ALL')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -31,13 +35,27 @@ function ProductRevenue() {
 
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return rows
-    return rows.filter((row) =>
-      [row.prodcode, row.description, row.unit]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-    )
-  }, [rows, search])
+
+    return rows.filter((row) => {
+      const revenue = Number(getReportValue(row, 'totalRevenue', 'totalrevenue') || 0)
+      const matchesSearch =
+        !term ||
+        [row.prodCode, row.prodcode, row.description, row.unit]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(term))
+      const matchesUnit = unitFilter === 'ALL' || row.unit === unitFilter
+      const matchesRevenue =
+        revenueFilter === 'ALL' ||
+        (revenueFilter === 'WITH_REVENUE' && revenue > 0) ||
+        (revenueFilter === 'NO_REVENUE' && revenue === 0)
+
+      return matchesSearch && matchesUnit && matchesRevenue
+    })
+  }, [revenueFilter, rows, search, unitFilter])
+
+  const unitOptions = useMemo(() => {
+    return [...new Set(rows.map((row) => row.unit).filter(Boolean))].sort()
+  }, [rows])
 
   const stats = useMemo(() => {
     // UPDATED: Now uses 'total_units_sold' and 'total_revenue'
@@ -62,12 +80,34 @@ function ProductRevenue() {
             <p className="reports-subtitle">Read-only revenue report by product description, quantity sold, and revenue.</p>
           </div>
         </div>
-        <div className="reports-search">
-          <Search size={14} />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search product, code, unit..."
+
+        <div className="reports-filters">
+          <div className="reports-search">
+            <Search size={14} />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search product, code, unit..."
+            />
+          </div>
+          <FilterDropdown
+            label="Unit"
+            value={unitFilter}
+            onChange={setUnitFilter}
+            options={[
+              { value: 'ALL', label: 'All Units' },
+              ...unitOptions.map((unit) => ({ value: unit, label: unit })),
+            ]}
+          />
+          <FilterDropdown
+            label="Revenue"
+            value={revenueFilter}
+            onChange={setRevenueFilter}
+            options={[
+              { value: 'ALL', label: 'All Revenue' },
+              { value: 'WITH_REVENUE', label: 'With Revenue' },
+              { value: 'NO_REVENUE', label: 'No Revenue' },
+            ]}
           />
         </div>
       </div>
@@ -113,9 +153,9 @@ function ProductRevenue() {
                 <tr>
                   <th>Product Code</th>
                   <th>Description</th>
-                  <th>Unit</th>
-                  <th>Total Qty Sold</th>
-                  <th>Total Revenue</th>
+                  <th className="reports-align-center">Unit</th>
+                  <th className="reports-align-center">Total Qty Sold</th>
+                  <th className="reports-align-center">Total Revenue</th>
                 </tr>
               </thead>
               <tbody>
@@ -129,9 +169,9 @@ function ProductRevenue() {
                     <tr key={pCode}>
                       <td className="reports-code-cell">{pCode}</td>
                       <td className="reports-primary-cell">{row.description || '-'}</td>
-                      <td>{row.unit || '-'}</td>
-                      <td>{Number(qty).toLocaleString()}</td>
-                      <td className="reports-money-cell">{formatCurrency(rev)}</td>
+                      <td className="reports-align-center">{row.unit || '-'}</td>
+                      <td className="reports-align-center">{Number(qty).toLocaleString()}</td>
+                      <td className="reports-money-cell reports-align-center">{formatCurrency(rev)}</td>
                     </tr>
                   )
                 })}

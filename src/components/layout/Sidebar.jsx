@@ -1,7 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
-  ChevronLeft,
-  ChevronRight,
   BarChart3,
   LayoutDashboard,
   LogOut,
@@ -16,11 +14,14 @@ import { useAuth } from '../../context/useAuth'
 import { useRights } from '../../context/useRights'
 import neuLogo from '../../assets/neu-logo.png'
 import { canManageDeletedCustomers, canViewAdmin as canViewAdminByRights } from '../../utils/accessRules'
+import ProfileSettingsModal from '../shared/ProfileSettingsModal'
 
 function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+  const collapsed = false
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [showProfileSettings, setShowProfileSettings] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [savedProfilesByKey, setSavedProfilesByKey] = useState({})
   const navigate = useNavigate()
   const { user: authUser, signOut } = useAuth()
   const { rights, userType: rightsUserType } = useRights()
@@ -28,6 +29,17 @@ function Sidebar() {
   const userType = rightsUserType ?? authUser?.user_type ?? 'USER'
   const canViewAdmin = canViewAdminByRights(rights)
   const canViewDeletedCustomers = canManageDeletedCustomers(userType)
+  const profileStorageKey = `hope-cms-profile-${authUser?.id || authUser?.email || 'local'}`
+
+  const storedProfile = useMemo(() => {
+    try {
+      const stored = window.localStorage.getItem(profileStorageKey)
+      return stored ? JSON.parse(stored) : null
+    } catch {
+      return null
+    }
+  }, [profileStorageKey])
+  const savedProfile = savedProfilesByKey[profileStorageKey] || storedProfile
 
   const sections = [
     {
@@ -63,18 +75,42 @@ function Sidebar() {
           : []),
       ],
     },
-  ]
+  ].filter((section) => section.items.length > 0)
+
+  const avatarUrl =
+    authUser?.user_metadata?.avatar_url ||
+    authUser?.user_metadata?.picture ||
+    authUser?.identities?.find((identity) => identity.identity_data?.avatar_url || identity.identity_data?.picture)
+      ?.identity_data?.avatar_url ||
+    authUser?.identities?.find((identity) => identity.identity_data?.picture)?.identity_data?.picture
+
+  const metadataName =
+    authUser?.user_metadata?.full_name ||
+    authUser?.user_metadata?.name ||
+    authUser?.identities?.find((identity) => identity.identity_data?.full_name || identity.identity_data?.name)
+      ?.identity_data?.full_name ||
+    authUser?.identities?.find((identity) => identity.identity_data?.name)?.identity_data?.name
+  const dbName = authUser?.full_name && authUser.full_name.toLowerCase() !== 'admin user' ? authUser.full_name : ''
+  const displayName =
+    savedProfile?.name ||
+    dbName ||
+    authUser?.username ||
+    metadataName ||
+    authUser?.email?.split('@')?.[0]?.replace(/[._-]+/g, ' ') ||
+    'Hope User'
 
   const user = {
-    name: authUser?.full_name ?? authUser?.user_metadata?.full_name ?? 'Hope User',
+    name: displayName,
     email: authUser?.email ?? 'admin@hope.com',
-    initials: (authUser?.full_name ?? authUser?.email ?? 'A')
+    initials: (displayName || authUser?.email || 'A')
       .split(' ')
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part.charAt(0).toUpperCase())
       .join('') || 'A',
     role: userType,
+    avatarUrl: savedProfile?.avatarUrl || avatarUrl,
+    lastSignInAt: authUser?.last_sign_in_at,
   }
 
   const handleSignOut = async () => {
@@ -139,38 +175,6 @@ function Sidebar() {
           );
           box-shadow: 0 0 14px rgba(56, 189, 248, 0.34);
           pointer-events: none;
-        }
-
-        .sidebar-toggle {
-          position: absolute;
-          right: -11px;
-          top: 82px;
-          width: 24px;
-          height: 38px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 10px;
-          border: 1px solid rgba(126, 184, 255, 0.16);
-          background: rgba(7, 18, 42, 0.96);
-          color: rgba(180, 210, 255, 0.46);
-          cursor: pointer;
-          z-index: 80;
-          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18), 0 0 0 2px rgba(4, 9, 22, 0.86);
-          transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .sidebar-toggle:hover {
-          transform: translateX(${collapsed ? '1px' : '-1px'});
-          border-color: rgba(126, 184, 255, 0.34);
-          background: rgba(18, 40, 82, 0.96);
-          color: rgba(230, 244, 255, 0.86);
-          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22), 0 0 0 2px rgba(4, 9, 22, 0.86);
-        }
-
-        .sidebar-toggle:focus-visible {
-          outline: 2px solid rgba(126, 184, 255, 0.9);
-          outline-offset: 3px;
         }
 
         .sidebar-header {
@@ -437,6 +441,16 @@ function Sidebar() {
             padding 0.42s cubic-bezier(0.22, 1, 0.36, 1),
             gap 0.42s cubic-bezier(0.22, 1, 0.36, 1),
             justify-content 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+          border-radius: 12px;
+          cursor: pointer;
+          border: 1px solid transparent;
+          background: transparent;
+          transition: border-color 0.22s ease, background 0.22s ease;
+        }
+
+        .sidebar-user:hover {
+          border-color: rgba(126, 184, 255, 0.16);
+          background: rgba(126, 184, 255, 0.06);
         }
 
         .user-avatar {
@@ -452,6 +466,14 @@ function Sidebar() {
           font-size: 12px;
           font-weight: 850;
           box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
+          overflow: hidden;
+        }
+
+        .user-avatar-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
 
         .user-info {
@@ -620,16 +642,6 @@ function Sidebar() {
       `}</style>
 
       <aside className="sidebar">
-        <button
-          className="sidebar-toggle"
-          type="button"
-          onClick={() => setCollapsed((value) => !value)}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
-        </button>
-
         <div className="sidebar-header">
           <div className="brand-block">
             <div className="logo-wrapper">
@@ -668,14 +680,31 @@ function Sidebar() {
 
         <div className="user-accent" />
 
-        <div className="sidebar-user">
-          <div className="user-avatar">{user.initials}</div>
+        <div className="sidebar-user" role="button" tabIndex={0} onClick={() => setShowProfileSettings(true)} onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') setShowProfileSettings(true)
+        }}>
+          <div className="user-avatar">
+            {user.avatarUrl ? (
+              <img className="user-avatar-img" src={user.avatarUrl} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              user.initials
+            )}
+          </div>
           <div className="user-info">
             <span className="user-name">{user.name}</span>
             <span className="user-email">{user.email}</span>
             <span className="user-role">{user.role}</span>
           </div>
-          <button className="logout-btn" type="button" title="Sign out" onClick={() => setShowLogoutConfirm(true)} disabled={isSigningOut}>
+          <button
+            className="logout-btn"
+            type="button"
+            title="Sign out"
+            onClick={(event) => {
+              event.stopPropagation()
+              setShowLogoutConfirm(true)
+            }}
+            disabled={isSigningOut}
+          >
             <LogOut size={14} />
           </button>
         </div>
@@ -699,6 +728,19 @@ function Sidebar() {
             </div>
           </div>
         </div>
+      )}
+
+      {showProfileSettings && (
+        <ProfileSettingsModal
+          user={user}
+          storageKey={profileStorageKey}
+          savedProfile={savedProfile}
+          onClose={() => setShowProfileSettings(false)}
+          onLogout={handleSignOut}
+          onSaveProfile={(profile) => {
+            setSavedProfilesByKey((current) => ({ ...current, [profileStorageKey]: profile }))
+          }}
+        />
       )}
     </>
   )
