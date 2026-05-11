@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   BarChart3,
+  ClipboardList,
   LayoutDashboard,
   LogOut,
   Package,
@@ -29,6 +30,7 @@ function Sidebar() {
   const userType = rightsUserType ?? authUser?.user_type ?? 'USER'
   const canViewAdmin = canViewAdminByRights(rights)
   const canViewDeletedCustomers = canManageDeletedCustomers(userType)
+  const canViewAuditLogs = String(userType).toUpperCase() === 'SUPERADMIN'
   const profileStorageKey = `hope-cms-profile-${authUser?.id || authUser?.email || 'local'}`
 
   const storedProfile = useMemo(() => {
@@ -72,6 +74,9 @@ function Sidebar() {
           : []),
         ...(canViewDeletedCustomers
           ? [{ icon: Trash2, label: 'Deleted Customers', path: '/deleted-customers' }]
+          : []),
+        ...(canViewAuditLogs
+          ? [{ icon: ClipboardList, label: 'Audit Logs', path: '/audit-logs' }]
           : []),
       ],
     },

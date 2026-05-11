@@ -163,7 +163,7 @@ function CustomerSalesSummary() {
               <thead>
                 <tr>
                   <th>Customer</th>
-                  <th>Transactions</th>
+                  <th className="reports-align-center">Transactions</th>
                   <th className="reports-align-center">Total Spend</th>
                 </tr>
               </thead>
@@ -184,7 +184,7 @@ function CustomerSalesSummary() {
                         )}
                         {row.custno && <div className="reports-code-cell">{row.custno}</div>}
                       </td>
-                      <td>{Number(totalTransactions).toLocaleString()}</td>
+                      <td className="reports-align-center">{Number(totalTransactions).toLocaleString()}</td>
                       <td className="reports-money-cell reports-align-center">{formatCurrency(totalSpend)}</td>
                     </tr>
                   )

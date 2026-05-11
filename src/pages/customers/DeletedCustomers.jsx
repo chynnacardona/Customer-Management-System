@@ -283,7 +283,9 @@ function DeletedCustomers() {
 
         .deleted-table {
           width: 100%;
+          min-width: 0;
           border-collapse: collapse;
+          table-layout: fixed;
         }
 
         .deleted-table th {
@@ -303,9 +305,19 @@ function DeletedCustomers() {
           padding: 13px 16px;
           font-size: 12.5px;
           color: rgba(180, 210, 255, 0.68);
-          white-space: nowrap;
           border-bottom: 1px solid rgba(100, 160, 255, 0.05);
         }
+
+        .deleted-table th:nth-child(1),
+        .deleted-table td:nth-child(1) { width: 13%; }
+        .deleted-table th:nth-child(2),
+        .deleted-table td:nth-child(2) { width: 27%; }
+        .deleted-table th:nth-child(3),
+        .deleted-table td:nth-child(3) { width: 15%; }
+        .deleted-table th:nth-child(4),
+        .deleted-table td:nth-child(4) { width: 31%; }
+        .deleted-table th:nth-child(5),
+        .deleted-table td:nth-child(5) { width: 14%; }
 
         .deleted-table tbody tr:last-child td {
           border-bottom: none;
@@ -333,7 +345,9 @@ function DeletedCustomers() {
 
         .deleted-stamp {
           color: rgba(180, 210, 255, 0.44) !important;
-          min-width: 280px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .deleted-status {
@@ -368,6 +382,13 @@ function DeletedCustomers() {
           white-space: nowrap;
         }
 
+        .deleted-action-group {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
         .recover-btn:hover:not(:disabled) {
           transform: translateY(-1px);
           background: rgba(34, 197, 94, 0.13);
@@ -396,6 +417,7 @@ function DeletedCustomers() {
           font-size: 12.5px;
         }
 
+
         @media (max-width: 780px) {
           .deleted-search { min-width: 100%; }
           .deleted-filters { width: 100%; }
@@ -403,7 +425,7 @@ function DeletedCustomers() {
             align-items: flex-start;
             flex-direction: column;
           }
-          .deleted-table { min-width: 760px; }
+          .deleted-table { min-width: 0; }
         }
       `}</style>
 
@@ -495,16 +517,18 @@ function DeletedCustomers() {
                           <td className="deleted-custno">{customer.custno}</td>
                           <td className="deleted-custname">{customer.custname}</td>
                           <td><span className="deleted-status">{customer.record_status || 'INACTIVE'}</span></td>
-                          <td className="deleted-stamp">{customer.stamp || customer.record_status || 'INACTIVE'}</td>
+                          <td className="deleted-stamp" title={customer.stamp || customer.record_status || 'INACTIVE'}>{customer.stamp || customer.record_status || 'INACTIVE'}</td>
                           <td>
-                            <button
-                              className="recover-btn"
-                              disabled={recoveringCustno === customer.custno}
-                              onClick={() => handleRecover(customer)}
-                            >
-                              <RotateCcw size={13} />
-                              {recoveringCustno === customer.custno ? 'Recovering' : 'Recover'}
-                            </button>
+                            <div className="deleted-action-group">
+                              <button
+                                className="recover-btn"
+                                disabled={recoveringCustno === customer.custno}
+                                onClick={() => handleRecover(customer)}
+                              >
+                                <RotateCcw size={13} />
+                                {recoveringCustno === customer.custno ? 'Recovering' : 'Recover'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -516,6 +540,7 @@ function DeletedCustomers() {
           </>
         )}
       </div>
+
     </>
   )
 }
