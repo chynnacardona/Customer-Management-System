@@ -23,14 +23,13 @@ function ProductRevenue() {
         setLoading(true)
         setError('')
         const data = await getProductRevenue()
-        setRows(data)
+        setRows(data || [])
       } catch (err) {
         setError(err.message || 'Unable to load product revenue.')
       } finally {
         setLoading(false)
       }
     }
-
     loadProductRevenue()
   }, [])
 
@@ -59,15 +58,15 @@ function ProductRevenue() {
   }, [rows])
 
   const stats = useMemo(() => {
+    // UPDATED: Now uses 'total_units_sold' and 'total_revenue'
     const totalQty = rows.reduce(
-      (sum, row) => sum + Number(getReportValue(row, 'totalQtySold', 'totalqtysold') || 0),
+      (sum, row) => sum + Number(getReportValue(row, 'totalQtySold', 'total_units_sold') || 0),
       0
     )
     const totalRevenue = rows.reduce(
-      (sum, row) => sum + Number(getReportValue(row, 'totalRevenue', 'totalrevenue') || 0),
+      (sum, row) => sum + Number(getReportValue(row, 'totalRevenue', 'total_revenue') || 0),
       0
     )
-
     return { productCount: rows.length, totalQty, totalRevenue }
   }, [rows])
 
@@ -113,7 +112,7 @@ function ProductRevenue() {
         </div>
       </div>
 
-      <section className="reports-stat-grid" aria-label="Product revenue totals">
+      <section className="reports-stat-grid">
         <div className="reports-stat-card">
           <div className="reports-stat-icon"><Package size={17} /></div>
           <div>
@@ -161,17 +160,18 @@ function ProductRevenue() {
               </thead>
               <tbody>
                 {filteredRows.map((row) => {
-                  const prodCode = getReportValue(row, 'prodCode', 'prodcode')
-                  const totalQtySold = getReportValue(row, 'totalQtySold', 'totalqtysold') || 0
-                  const totalRevenue = getReportValue(row, 'totalRevenue', 'totalrevenue') || 0
+                  // UPDATED: Key mapping to match your SQL underscores
+                  const pCode = getReportValue(row, 'prodcode', 'prodCode')
+                  const qty = getReportValue(row, 'total_units_sold', 'totalQtySold') || 0
+                  const rev = getReportValue(row, 'total_revenue', 'totalRevenue') || 0
 
                   return (
-                    <tr key={prodCode}>
-                      <td className="reports-code-cell">{prodCode}</td>
+                    <tr key={pCode}>
+                      <td className="reports-code-cell">{pCode}</td>
                       <td className="reports-primary-cell">{row.description || '-'}</td>
                       <td className="reports-align-center">{row.unit || '-'}</td>
-                      <td className="reports-align-center">{Number(totalQtySold).toLocaleString()}</td>
-                      <td className="reports-money-cell reports-align-center">{formatCurrency(totalRevenue)}</td>
+                      <td className="reports-align-center">{Number(qty).toLocaleString()}</td>
+                      <td className="reports-money-cell reports-align-center">{formatCurrency(rev)}</td>
                     </tr>
                   )
                 })}

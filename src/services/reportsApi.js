@@ -7,7 +7,6 @@ export const getReportValue = (row, ...keys) => {
   for (const key of keys) {
     if (row?.[key] !== undefined && row?.[key] !== null) return row[key]
   }
-
   return null
 }
 
@@ -92,6 +91,7 @@ export async function getCustomerSalesSummary() {
 
 export async function getTopCustomers(limit = 10) {
   const rows = await getCustomerSalesSummary()
+
   return rows
     .filter((row) => row.totalSpend > 0)
     .slice(0, limit)
