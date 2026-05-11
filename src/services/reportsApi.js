@@ -14,11 +14,12 @@ const normalizeCustomerSummaryRow = (row) => ({
   ...row,
   custno: getReportValue(row, 'custno', 'custNo'),
   custname: getReportValue(row, 'custname', 'custName'),
+  // Wiring payterm and status directly from database keys
   payterm: getReportValue(row, 'payterm', 'payTerm'),
   record_status: getReportValue(row, 'record_status', 'recordStatus'),
-  totalTransactions: Number(getReportValue(row, 'totalTransactions', 'totaltransactions', 'total_transactions') || 0),
-  totalSpend: Number(getReportValue(row, 'totalSpend', 'totalspend', 'total_spent') || 0),
-  lastSaleDate: getReportValue(row, 'lastSaleDate', 'lastsaledate', 'last_sale_date'),
+  totalTransactions: Number(getReportValue(row, 'totalTransactions', 'total_transactions') || 0),
+  totalSpend: Number(getReportValue(row, 'totalSpend', 'total_spent') || 0),
+  // lastSaleDate removed as requested
 })
 
 const normalizeProductRevenueRow = (row) => ({
@@ -78,15 +79,21 @@ async function getProductRevenueFallback() {
 }
 
 export async function getCustomerSalesSummary() {
-  const { data, error } = await supabase
-    .from('customer_sales_summary')
-    .select('*')
+  // Fetch from both sources to ensure wiring of status and payterm
+  const [summaryRes, customersRes] = await Promise.all([
+    supabase.from('customer_sales_summary').select('*'),
+    supabase.from('customer').select('custno, custname, payterm, record_status')
+  ])
 
-  if (error) throw error
+  if (summaryRes.error) throw summaryRes.error
+  if (customersRes.error) throw customersRes.error
 
-  return [...(data || [])]
-    .map(normalizeCustomerSummaryRow)
-    .sort((a, b) => b.totalSpend - a.totalSpend)
+  const customerMap = new Map(customersRes.data?.map(c => [c.custname, c]))
+
+  return (summaryRes.data || []).map(row => {
+    const details = customerMap.get(row.custname) || {}
+    return normalizeCustomerSummaryRow({ ...row, ...details })
+  }).sort((a, b) => b.totalSpend - a.totalSpend)
 }
 
 export async function getTopCustomers(limit = 10) {
