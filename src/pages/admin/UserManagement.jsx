@@ -562,19 +562,19 @@ function UserManagement() {
                           </div>
                         </td>
                         <td className="role-col">
-                          <span className={`admin-role-badge ${roleTone}`}>
-                            {isSuperadmin ? <ShieldCheck size={12} /> : <UserCog size={12} />}
+                          <span className={`admin-role-badge ${String(user.user_type).toLowerCase()}`}> 
+                            {isSuper ? <ShieldCheck size={12} /> : <UserCog size={12} />}
                             {user.user_type || 'USER'}
                           </span>
                         </td>
                         <td className="status-col">
-                          <span className={`admin-status-badge ${statusTone}`}>
+                          <span className={`admin-status-badge ${normalizeStatus(user.record_status).toLowerCase()}`}> 
                             {isActive ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
                             {normalizeStatus(user.record_status) || 'INACTIVE'}
                           </span>
                         </td>
                         <td className="actions-col">
-                          {isSuperadmin ? (
+                          {isSuper ? (
                             <span
                               className="admin-protected-note"
                               title="SUPERADMIN accounts cannot be modified"
@@ -582,6 +582,7 @@ function UserManagement() {
                               <Lock size={13} />
                               SUPERADMIN accounts cannot be modified
                             </span>
+
                           ) : (
                             <div className="flex gap-2">
                               <button
