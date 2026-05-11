@@ -1,4 +1,5 @@
 import { supabase } from '../supabase/supabaseClient';
+import { logAuditActivity } from './auditLogService';
 
 export const customerService = {
   getCustomers: async () => {
@@ -18,6 +19,12 @@ export const customerService = {
       .insert([{ ...customerData, record_status: 'ACTIVE' }])
       .select();
     if (error) throw error;
+    await logAuditActivity({
+      action: 'Added customer',
+      entityType: 'customer',
+      entityId: customerData.custno,
+      metadata: { custname: customerData.custname },
+    });
     return data;
   },
 
@@ -28,6 +35,12 @@ export const customerService = {
       .eq('custno', custno)
       .select();
     if (error) throw error;
+    await logAuditActivity({
+      action: 'Updated customer',
+      entityType: 'customer',
+      entityId: custno,
+      metadata: { fields: Object.keys(updates || {}) },
+    });
     return data;
   },
 
@@ -38,6 +51,11 @@ export const customerService = {
       .eq('custno', custno)
       .select();
     if (error) throw error;
+    await logAuditActivity({
+      action: 'Deactivated customer',
+      entityType: 'customer',
+      entityId: custno,
+    });
     return data;
   },
 
@@ -49,6 +67,11 @@ export const customerService = {
       .select();
     
     if (error) throw error;
+    await logAuditActivity({
+      action: 'Recovered customer',
+      entityType: 'customer',
+      entityId: custno,
+    });
     return data;
   },
 
@@ -61,5 +84,18 @@ export const customerService = {
 
     if (error) throw error;
     return data;
+  },
+
+  subscribeToCustomerChanges: (onChange) => {
+    const channel = supabase
+      .channel('customer-live-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'customer' },
+        () => onChange()
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }
 };

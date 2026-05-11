@@ -1,10 +1,12 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import ParticlesBg from './ParticlesBg';
+import ActivityAuditTracker from '../shared/ActivityAuditTracker';
 
 const AppShell = () => {
   return (
     <div style={shellStyles.container}>
+      <ActivityAuditTracker />
       <ParticlesBg />
       <Sidebar />
       <main className="dashboard-scroll-pane" style={shellStyles.mainContent}>

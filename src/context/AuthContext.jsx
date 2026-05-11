@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../supabase/supabaseClient";
 import { AuthContext } from "./useAuth";
+import { logAuditActivity } from "../services/auditLogService";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -87,6 +88,12 @@ export const AuthProvider = ({ children }) => {
       }
 
       setUser({ ...sessionUser, ...userRow });
+      await logAuditActivity({
+        action: 'Signed in',
+        entityType: 'auth',
+        entityId: sessionUser.id,
+        metadata: { method: 'session', role: userRow.user_type },
+      });
     } catch {
       signOutWithNotice({
         tone: 'error',
