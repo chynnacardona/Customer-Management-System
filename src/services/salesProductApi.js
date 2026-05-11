@@ -1,5 +1,22 @@
 import { supabase } from "../supabase/supabaseClient";
 
+const getLatestUnitPrice = (priceHistory = []) => {
+  if (!Array.isArray(priceHistory) || priceHistory.length === 0) return 0
+
+  const latest = [...priceHistory].sort((a, b) => new Date(b.effdate) - new Date(a.effdate))[0]
+  return Number(latest?.unitprice || 0)
+}
+
+const getTransactionTotal = (salesDetailRows = []) => {
+  if (!Array.isArray(salesDetailRows) || salesDetailRows.length === 0) return 0
+
+  return salesDetailRows.reduce((sum, item) => {
+    const qty = Number(item?.quantity || 0)
+    const unitPrice = getLatestUnitPrice(item?.product?.pricehist || [])
+    return sum + (qty * unitPrice)
+  }, 0)
+}
+
 export const getSalesByCustomer = async (custno) => {
   const { data, error } = await supabase
     .from('sales')
@@ -32,12 +49,24 @@ export const getSales = async () => {
       custno,
       customer (
         custname
+      ),
+      salesdetail (
+        quantity,
+        product (
+          pricehist (
+            unitprice,
+            effdate
+          )
+        )
       )
     `)
     .order('salesdate', { ascending: false });
 
   if (error) throw error;
-  return data;
+  return (data || []).map((sale) => ({
+    ...sale,
+    total_amount: Number(getTransactionTotal(sale.salesdetail || []).toFixed(2)),
+  }));
 };
 
 export const getSalesDetail = async (transno) => {

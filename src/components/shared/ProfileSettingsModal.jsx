@@ -53,17 +53,6 @@ function ProfileSettingsModal({ user, storageKey, savedProfile, onClose, onLogou
       .map((part) => part.charAt(0).toUpperCase())
       .join('') || 'U'
   }, [formName, user?.email])
-
-  const auditEntries = useMemo(
-    () => [
-      `Profile opened by ${user?.email || 'current user'}`,
-      `Role checked: ${user?.role || 'USER'}`,
-      `Security preference changed: ${settings.twoFactor ? '2FA enabled' : '2FA disabled'}`,
-    ],
-    [settings.twoFactor, user]
-  )
-
-  const isSuperAdmin = String(user?.role || '').toUpperCase() === 'SUPERADMIN'
   const lastSignIn = user?.lastSignInAt
     ? new Intl.DateTimeFormat('en-PH', {
       dateStyle: 'medium',
@@ -238,12 +227,6 @@ function ProfileSettingsModal({ user, storageKey, savedProfile, onClose, onLogou
                 { value: 'dd/MM/yyyy', label: 'dd/MM/yyyy' },
               ]} />
             </div>
-            {isSuperAdmin && (
-              <div className="profile-settings-control-row">
-                <label>Audit Logs</label>
-                <div className="profile-feature-stack">{auditEntries.map((entry) => <span key={entry}>{entry}</span>)}</div>
-              </div>
-            )}
           </section>
         )}
 

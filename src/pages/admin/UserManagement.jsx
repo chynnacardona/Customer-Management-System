@@ -10,10 +10,8 @@ import {
   XCircle,
 } from 'lucide-react'
 import FilterDropdown from '../../components/shared/FilterDropdown'
-import { supabase } from '../../supabase/supabaseClient'
+import { logAuditActivity } from '../../services/auditLogService'
 import { getUsers, activateUser, deactivateUser } from '../../services/adminApi'
-
-const USER_SELECT = 'userId, email, full_name, user_type, record_status'
 
 function normalizeStatus(status) {
   return String(status || '').toUpperCase()
@@ -32,6 +30,7 @@ function UserManagement() {
   const [actionUserId, setActionUserId] = useState(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [noticeTone, setNoticeTone] = useState('success')
 
   // PR-01: Fetch Users using the Service Layer
   const loadUsers = useCallback(async () => {
@@ -110,6 +109,13 @@ function UserManagement() {
             : currentUser
         )
       )
+      await logAuditActivity({
+        action: `${nextStatus === 'ACTIVE' ? 'Activated' : 'Deactivated'} user account`,
+        entityType: 'user',
+        entityId: user.userId,
+        metadata: { email: user.email, userType: user.user_type },
+      })
+      setNoticeTone(nextStatus === 'ACTIVE' ? 'success' : 'warning')
       setNotice(`${user.full_name || user.email} is now ${nextStatus.toLowerCase()}.`)
     } catch (err) {
       setError(err.message || 'Update failed: You may not have permission.')
@@ -269,6 +275,12 @@ function UserManagement() {
           border: 1px solid rgba(34, 197, 94, 0.18);
           background: rgba(34, 197, 94, 0.08);
           color: rgba(134, 239, 172, 0.95);
+        }
+
+        .admin-feedback.warning {
+          border: 1px solid rgba(251, 146, 60, 0.22);
+          background: rgba(249, 115, 22, 0.1);
+          color: rgba(253, 186, 116, 0.96);
         }
 
         .admin-table-card {
@@ -530,7 +542,7 @@ function UserManagement() {
         </section>
 
         {error && <div className="admin-feedback error">{error}</div>}
-        {notice && <div className="admin-feedback success">{notice}</div>}
+        {notice && <div className={`admin-feedback ${noticeTone}`}>{notice}</div>}
 
         <section className="admin-table-card">
           {loading ? (

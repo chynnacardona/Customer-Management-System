@@ -67,6 +67,14 @@ function CustomerListPage() {
     fetchFromDB()
   }, [fetchFromDB])
 
+  useEffect(() => {
+    const unsubscribe = customerService.subscribeToCustomerChanges(() => {
+      fetchFromDB()
+    })
+
+    return () => unsubscribe()
+  }, [fetchFromDB])
+
   const filtered = customers.filter((customer) => {
     const matchesSearch =
       customer.custname?.toLowerCase().includes(search.toLowerCase()) ||

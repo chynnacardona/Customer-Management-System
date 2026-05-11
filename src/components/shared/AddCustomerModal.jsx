@@ -14,24 +14,45 @@ function AddCustomerModal({ isOpen, onClose, onSubmit }) {
 
   if (!isOpen) return null
 
+  const getFriendlyError = (err) => {
+    const message = String(err?.message || '')
+
+    if (err?.code === '23505' || message.includes('duplicate key') || message.includes('customer_pkey')) {
+      return `Customer No. ${form.custno.trim().toUpperCase()} already exists. Use a unique customer number.`
+    }
+
+    return message || 'Unable to add customer.'
+  }
+
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const value = e.target.name === 'custno' ? e.target.value.toUpperCase() : e.target.value
+    setForm({ ...form, [e.target.name]: value })
+    setError('')
   }
 
   const handleSubmit = async () => {
+    const custno = form.custno.trim().toUpperCase()
+    const custname = form.custname.trim()
+    const address = form.address.trim()
+
+    if (!custno || !custname || !address) {
+      setError('Please fill in customer number, name, and address.')
+      return
+    }
+
     try {
       setSaving(true)
       setError('')
       await onSubmit?.({
-        custno: form.custno.trim(),
-        custname: form.custname.trim(),
-        address: form.address.trim(),
+        custno,
+        custname,
+        address,
         payterm: form.payterm,
       })
       setForm({ custno: '', custname: '', address: '', payterm: 'COD' })
       onClose()
     } catch (err) {
-      setError(err.message || 'Unable to add customer.')
+      setError(getFriendlyError(err))
     } finally {
       setSaving(false)
     }
@@ -201,6 +222,12 @@ function AddCustomerModal({ isOpen, onClose, onSubmit }) {
         .btn-submit:disabled,
         .btn-cancel:disabled { opacity: 0.55; cursor: wait; transform: none; }
         .modal-error { color: #fca5a5; font-size: 12px; line-height: 1.45; margin: 0; }
+        .modal-error {
+          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid rgba(248, 113, 113, 0.2);
+          background: rgba(239, 68, 68, 0.08);
+        }
       `}</style>
 
       <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
