@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Loader2, Medal, ShoppingCart, Trophy, Users, Wallet } from 'lucide-react'
-import FilterDropdown from '../../components/shared/FilterDropdown'
 import {
+  formatCurrency,
   getReportValue,
   getTopCustomers,
 } from '../../services/reportsApi'
-import { useCurrencyFormatter } from '../../utils/currency'
 import './Reports.css'
 
 function TopCustomers() {
-  const { formatCurrency } = useCurrencyFormatter()
   const [rows, setRows] = useState([])
-  const [rankLimit, setRankLimit] = useState('10')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -33,24 +30,22 @@ function TopCustomers() {
     loadTopCustomers()
   }, [])
 
-  const visibleRows = useMemo(() => rows.slice(0, Number(rankLimit)), [rankLimit, rows])
-
   const stats = useMemo(() => {
-    const totalSpend = visibleRows.reduce(
-      (sum, row) => sum + Number(getReportValue(row, 'totalSpend', 'totalspend') || 0),
+    const totalSpend = rows.reduce(
+      (sum, row) => sum + Number(getReportValue(row, 'total_spent', 'total_spent') || 0),
       0
     )
-    const totalTransactions = visibleRows.reduce(
-      (sum, row) => sum + Number(getReportValue(row, 'totalTransactions', 'totaltransactions') || 0),
+    const totalTransactions = rows.reduce(
+      (sum, row) => sum + Number(getReportValue(row, 'total_transactions', 'total_transactions') || 0),
       0
     )
     const topSpend = Math.max(
-      ...visibleRows.map((row) => Number(getReportValue(row, 'totalSpend', 'totalspend') || 0)),
+      ...rows.map((row) => Number(getReportValue(row, 'total_spent', 'total_spent') || 0)),
       0
     )
 
     return { totalSpend, totalTransactions, topSpend }
-  }, [visibleRows])
+  }, [rows])
 
   return (
     <div className="reports-page">
@@ -64,27 +59,14 @@ function TopCustomers() {
             </p>
           </div>
         </div>
-
-        <div className="reports-filters">
-          <FilterDropdown
-            label="Rank limit"
-            value={rankLimit}
-            onChange={setRankLimit}
-            options={[
-              { value: '3', label: 'Top 3' },
-              { value: '5', label: 'Top 5' },
-              { value: '10', label: 'Top 10' },
-            ]}
-          />
-        </div>
       </div>
 
       <section className="reports-stat-grid" aria-label="Top customer totals">
         <div className="reports-stat-card">
           <div className="reports-stat-icon"><Users size={17} color="#ffffff" /></div>
           <div>
-            <span className="reports-stat-label">Ranked Customers</span>
-            <span className="reports-stat-value">{visibleRows.length}</span>
+            <span className="reports-stat-label" style={{ color: 'rgba(255,255,255,0.6)' }}>Ranked Customers</span>
+            <span className="reports-stat-value">{rows.length}</span>
           </div>
         </div>
         <div className="reports-stat-card">
@@ -97,7 +79,7 @@ function TopCustomers() {
         <div className="reports-stat-card">
           <div className="reports-stat-icon"><Wallet size={17} color="#ffffff" /></div>
           <div>
-            <span className="reports-stat-label">Ranked Spend</span>
+            <span className="reports-stat-label" style={{ color: 'rgba(255,255,255,0.6)' }}>Top 10 Spend</span>
             <span className="reports-stat-value">{formatCurrency(stats.totalSpend)}</span>
           </div>
         </div>
@@ -111,13 +93,13 @@ function TopCustomers() {
             <Loader2 className="animate-spin mb-3 mx-auto text-blue-400" size={28} />
             <p style={{ color: '#ffffff' }}>Loading top customers...</p>
           </div>
-        ) : visibleRows.length === 0 ? (
-          <div className="reports-empty">No ranked customers found.</div>
+        ) : rows.length === 0 ? (
+          <div className="reports-empty" style={{ color: '#ffffff' }}>No ranked customers found.</div>
         ) : (
           <div className="leaderboard-list">
-            {visibleRows.map((row, index) => {
-              const totalSpend = Number(getReportValue(row, 'totalSpend', 'totalspend') || 0)
-              const totalTransactions = Number(getReportValue(row, 'totalTransactions', 'totaltransactions') || 0)
+            {rows.map((row, index) => {
+              const totalSpend = Number(getReportValue(row, 'total_spent', 'total_spent') || 0)
+              const totalTransactions = Number(getReportValue(row, 'total_transactions', 'total_transactions') || 0)
               const width = stats.topSpend > 0 ? Math.max((totalSpend / stats.topSpend) * 100, 3) : 0
 
               return (
