@@ -4,8 +4,10 @@ import { ArrowLeft, BadgeCheck, CreditCard, MapPin, UserRound, Loader2 } from 'l
 import SalesHistoryPanel from '../../components/shared/SalesHistoryPanel'
 import { getSalesByCustomer } from '../../services/salesProductApi' 
 import { supabase } from '../../supabase/supabaseClient'
+import { useCurrencyFormatter } from '../../utils/currency'
 
 function CustomerDetailPage() {
+  const { formatCurrency } = useCurrencyFormatter()
   const { custno } = useParams()
   const navigate = useNavigate()
 
@@ -69,10 +71,7 @@ function CustomerDetailPage() {
   return sum + transactionTotal;
 }, 0);
 
-const formattedTotal = new Intl.NumberFormat('en-PH', { 
-  style: 'currency', 
-  currency: 'PHP' 
-}).format(totalSpend);
+const formattedTotal = formatCurrency(totalSpend);
 
   if (loading) {
     return (
@@ -168,7 +167,7 @@ const formattedTotal = new Intl.NumberFormat('en-PH', {
 const pageStyles = `
   @keyframes detailPageIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes detailCardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-  .customer-detail-page { animation: detailPageIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; display: flex; flex-direction: column; gap: 18px; }
+  .customer-detail-page { animation: detailPageIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; min-height: 100%; height: 100%; display: flex; flex-direction: column; gap: 18px; }
   .detail-topbar { display: flex; align-items: center; justify-content: space-between; }
   .detail-back-btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(126, 184, 255, 0.12); background: rgba(126, 184, 255, 0.04); color: rgba(180, 210, 255, 0.62); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all 0.18s ease; }
   .detail-back-btn:hover { transform: translateY(-1px); background: rgba(126, 184, 255, 0.08); color: rgba(220, 235, 255, 0.92); border-color: rgba(56, 189, 248, 0.28); }

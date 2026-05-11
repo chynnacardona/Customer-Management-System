@@ -50,19 +50,19 @@ function CustomerSalesSummary() {
     )
   }, [rows, search])
 
- const stats = useMemo(() => {
-  // UPDATED: Look for 'total_spent' and 'total_transactions'
-  const totalSpend = rows.reduce(
-    (sum, row) => sum + Number(getReportValue(row, 'totalSpend', 'total_spent') || 0),
-    0
-  )
-  const totalTransactions = rows.reduce(
-    (sum, row) => sum + Number(getReportValue(row, 'totalTransactions', 'total_transactions') || 0),
-    0
-  )
+  const stats = useMemo(() => {
+    // UPDATED: Look for 'total_spent' and 'total_transactions'
+    const totalSpend = rows.reduce(
+      (sum, row) => sum + Number(getReportValue(row, 'totalSpend', 'total_spent') || 0),
+      0
+    )
+    const totalTransactions = rows.reduce(
+      (sum, row) => sum + Number(getReportValue(row, 'totalTransactions', 'total_transactions') || 0),
+      0
+    )
 
-  return { totalCustomers: rows.length, totalSpend, totalTransactions }
-}, [rows])
+    return { totalCustomers: rows.length, totalSpend, totalTransactions }
+  }, [rows])
 
   return (
     <div className="reports-page">

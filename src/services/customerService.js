@@ -1,11 +1,12 @@
 import { supabase } from '../supabase/supabaseClient';
 
 export const customerService = {
-  getCustomers: async (userType) => {
-    let query = supabase.from('customer').select('*').order('custno');
-    if (userType === 'USER') {
-      query = query.in('record_status', ['ACTIVE', 'active']);
-    }
+  getCustomers: async () => {
+    const query = supabase
+      .from('customer')
+      .select('*')
+      .in('record_status', ['ACTIVE', 'active'])
+      .order('custno');
     const { data, error } = await query;
     if (error) throw error;
     return data;

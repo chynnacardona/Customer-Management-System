@@ -1,15 +1,7 @@
 import { supabase } from '../supabase/supabaseClient'
+import { formatCurrencyValue } from '../utils/currency'
 
-const moneyFormatter = new Intl.NumberFormat('en-PH', {
-  style: 'currency',
-  currency: 'PHP',
-  maximumFractionDigits: 2,
-})
-
-/**
- * Formats a number into Philippine Peso (PHP)
- */
-export const formatCurrency = (value) => moneyFormatter.format(Number(value || 0))
+export const formatCurrency = formatCurrencyValue
 
 /**
  * UTILITY: Checks multiple possible key names (camelCase vs snake_case)
