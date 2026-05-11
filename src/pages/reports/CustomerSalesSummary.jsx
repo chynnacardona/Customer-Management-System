@@ -139,12 +139,16 @@ function CustomerSalesSummary() {
                   const lastSaleDate = getReportValue(row, 'lastSaleDate', 'lastsaledate')
 
                   return (
-                    <tr key={row.custno}>
+                    <tr key={row.custno || row.custname}>
                       <td>
-                        <Link className="reports-link" to={`/customers/${row.custno}`}>
-                          {row.custname || row.custno}
-                        </Link>
-                        <div className="reports-code-cell">{row.custno}</div>
+                        {row.custno ? (
+                          <Link className="reports-link" to={`/customers/${row.custno}`}>
+                            {row.custname || row.custno}
+                          </Link>
+                        ) : (
+                          <span className="reports-primary-cell">{row.custname || 'Unknown customer'}</span>
+                        )}
+                        {row.custno && <div className="reports-code-cell">{row.custno}</div>}
                       </td>
                       <td>{row.payterm || '-'}</td>
                       <td>{Number(tTransactions).toLocaleString()}</td>

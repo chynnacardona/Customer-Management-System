@@ -102,13 +102,17 @@ function TopCustomers() {
               const width = stats.topSpend > 0 ? Math.max((totalSpend / stats.topSpend) * 100, 3) : 0
 
               return (
-                <div className="leaderboard-row" key={row.custno}>
+                <div className="leaderboard-row" key={row.custno || row.custname}>
                   <div className="leaderboard-rank">
                     {index < 3 ? <Medal size={15} /> : index + 1}
                   </div>
                   <div className="leaderboard-name">
-                    <Link to={`/customers/${row.custno}`}>{row.custname || row.custno}</Link>
-                    <span>{row.custno} • {totalTransactions.toLocaleString()} transactions</span>
+                    {row.custno ? (
+                      <Link to={`/customers/${row.custno}`}>{row.custname || row.custno}</Link>
+                    ) : (
+                      <strong>{row.custname || 'Unknown customer'}</strong>
+                    )}
+                    <span>{row.custno ? `${row.custno} - ` : ''}{totalTransactions.toLocaleString()} transactions</span>
                   </div>
                   <div className="leaderboard-meter-wrap">
                     <div className="leaderboard-meter" aria-hidden="true">
