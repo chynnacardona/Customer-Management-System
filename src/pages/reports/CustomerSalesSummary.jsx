@@ -1,68 +1,57 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BarChart3, Loader2, Search, ShoppingCart, Users, Wallet } from 'lucide-react'
-import {
-  formatCurrency,
-  getCustomerSalesSummary,
-  getReportValue,
-} from '../../services/reportsApi'
+import { BarChart3, Loader2, Search, ShoppingCart, Users, UserX, Wallet } from 'lucide-react'
+import { formatCurrency, getCustomerSalesSummary } from '../../services/reportsApi'
 import './Reports.css'
 
-function CustomerSalesSummary() {
+// IMPORTANT: user_type should be passed from your auth context/state
+function CustomerSalesSummary({ user_type = 'USER' }) { 
   const [rows, setRows] = useState([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+
+  const isAdmin = user_type === 'ADMIN' || user_type === 'SUPERADMIN'
 
   useEffect(() => {
     const loadSummary = async () => {
       try {
         setLoading(true)
-        setError('')
-        // Wired to your API which sorts by spend descending
         const data = await getCustomerSalesSummary()
         setRows(data || [])
       } catch (err) {
-        console.error('Report Load Error:', err)
-        setError(err.message || 'Unable to load customer sales summary.')
+        console.error('Report Error:', err)
       } finally {
         setLoading(false)
       }
     }
-
     loadSummary()
   }, [])
 
-  const filteredRows = useMemo(() => {
+  const { filteredRows, stats } = useMemo(() => {
+    // 1. Role Filter: Standard USERS only see ACTIVE customers
+    const roleBasedData = isAdmin 
+      ? rows 
+      : rows.filter(r => String(r.record_status || '').toUpperCase() === 'ACTIVE')
+
     const term = search.trim().toLowerCase()
-    if (!term) return rows
+    const searched = term 
+      ? roleBasedData.filter(r => 
+          [r.custname, r.custno, r.payterm].some(v => String(v || '').toLowerCase().includes(term))
+        )
+      : roleBasedData
 
-    return rows.filter((row) =>
-      [
-        row.custno,
-        row.custname,
-        row.payterm,
-        // Checks both record_status and recordStatus
-        getReportValue(row, 'recordStatus', 'record_status'),
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-    )
-  }, [rows, search])
+    // 2. Card Logic: Calculate ACTIVE and INACTIVE counts for cards
+    const activeCount = rows.filter(r => String(r.record_status || '').toUpperCase() === 'ACTIVE').length
+    const inactiveCount = rows.filter(r => String(r.record_status || '').toUpperCase() !== 'ACTIVE').length
+    
+    const totalTransactions = searched.reduce((sum, r) => sum + (r.totalTransactions || 0), 0)
+    const totalSpend = searched.reduce((sum, r) => sum + (r.totalSpend || 0), 0)
 
-  const stats = useMemo(() => {
-    // UPDATED: Look for 'total_spent' and 'total_transactions'
-    const totalSpend = rows.reduce(
-      (sum, row) => sum + Number(getReportValue(row, 'totalSpend', 'total_spent') || 0),
-      0
-    )
-    const totalTransactions = rows.reduce(
-      (sum, row) => sum + Number(getReportValue(row, 'totalTransactions', 'total_transactions') || 0),
-      0
-    )
-
-    return { totalCustomers: rows.length, totalSpend, totalTransactions }
-  }, [rows])
+    return { 
+      filteredRows: searched, 
+      stats: { activeCount, inactiveCount, totalTransactions, totalSpend } 
+    }
+  }, [rows, search, isAdmin])
 
   return (
     <div className="reports-page">
@@ -71,33 +60,40 @@ function CustomerSalesSummary() {
           <div className="reports-title-icon"><BarChart3 size={20} /></div>
           <div>
             <h1 className="reports-title">Customer Sales Summary</h1>
-            <p className="reports-subtitle">Searchable summary of transactions, total spend, and last sale date.</p>
+            <p className="reports-subtitle">Transaction history and account status.</p>
           </div>
         </div>
-
         <div className="reports-search">
           <Search size={14} />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search customer, payterm, status..."
-          />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." />
         </div>
       </div>
 
-      <section className="reports-stat-grid" aria-label="Customer sales summary totals">
+      <section className="reports-stat-grid">
+        {/* Requirement: Split cards for Admin/Superadmin */}
         <div className="reports-stat-card">
           <div className="reports-stat-icon"><Users size={17} /></div>
           <div>
-            <span className="reports-stat-label">Customers</span>
-            <span className="reports-stat-value">{stats.totalCustomers}</span>
+            <span className="reports-stat-label">{isAdmin ? 'Active' : 'Customers'}</span>
+            <span className="reports-stat-value">{stats.activeCount}</span>
           </div>
         </div>
+
+        {isAdmin && (
+          <div className="reports-stat-card">
+            <div className="reports-stat-icon" style={{ color: '#ef4444' }}><UserX size={17} /></div>
+            <div>
+              <span className="reports-stat-label">Inactive</span>
+              <span className="reports-stat-value">{stats.inactiveCount}</span>
+            </div>
+          </div>
+        )}
+
         <div className="reports-stat-card">
           <div className="reports-stat-icon"><ShoppingCart size={17} /></div>
           <div>
             <span className="reports-stat-label">Transactions</span>
-            <span className="reports-stat-value">{stats.totalTransactions}</span>
+            <span className="reports-stat-value">{stats.totalTransactions.toLocaleString()}</span>
           </div>
         </div>
         <div className="reports-stat-card">
@@ -109,58 +105,42 @@ function CustomerSalesSummary() {
         </div>
       </section>
 
-      {error && <div className="reports-feedback">{error}</div>}
-
       <section className="reports-table-card">
-        {loading ? (
-          <div className="reports-empty">
-            <Loader2 className="animate-spin mb-3 mx-auto text-blue-400" size={28} />
-            <p>Loading customer sales summary...</p>
-          </div>
-        ) : filteredRows.length === 0 ? (
-          <div className="reports-empty">No customer sales summary records found.</div>
-        ) : (
-          <div className="reports-table-scroll">
-            <table className="reports-table">
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Pay Term</th>
-                  <th>Transactions</th>
-                  <th>Total Spend</th>
-                  <th>Last Sale</th>
+        <div className="reports-table-scroll">
+          <table className="reports-table">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Pay Term</th>
+                <th style={{ textAlign: 'right' }}>Transactions</th>
+                <th style={{ textAlign: 'right' }}>Total Spend</th>
+                {isAdmin && <th>Status</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.map((row) => (
+                <tr key={row.custno}>
+                  <td>
+                    <Link className="reports-link" to={`/customers/${row.custno}`}>{row.custname}</Link>
+                    <div className="reports-code-cell">{row.custno}</div>
+                  </td>
+                  <td><span className="payterm-badge">{row.payterm || '-'}</span></td>
+                  <td style={{ textAlign: 'right' }}>{row.totalTransactions.toLocaleString()}</td>
+                  <td className="reports-money-cell" style={{ textAlign: 'right' }}>
+                    {formatCurrency(row.totalSpend)}
+                  </td>
+                  {isAdmin && (
+                    <td>
+                      <span className={`status-pill ${String(row.record_status || 'inactive').toLowerCase()}`}>
+                        {row.record_status || 'INACTIVE'}
+                      </span>
+                    </td>
+                  )}
                 </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map((row) => {
-                  // Ensure we use the helper for every numeric/date field coming from SQL
-                  const tTransactions = getReportValue(row, 'totalTransactions', 'total_transactions') || 0
-                  const tSpend = getReportValue(row, 'totalSpend', 'total_spent') || 0
-                  const lastSaleDate = getReportValue(row, 'lastSaleDate', 'lastsaledate')
-
-                  return (
-                    <tr key={row.custno || row.custname}>
-                      <td>
-                        {row.custno ? (
-                          <Link className="reports-link" to={`/customers/${row.custno}`}>
-                            {row.custname || row.custno}
-                          </Link>
-                        ) : (
-                          <span className="reports-primary-cell">{row.custname || 'Unknown customer'}</span>
-                        )}
-                        {row.custno && <div className="reports-code-cell">{row.custno}</div>}
-                      </td>
-                      <td>{row.payterm || '-'}</td>
-                      <td>{Number(tTransactions).toLocaleString()}</td>
-                      <td className="reports-money-cell">{formatCurrency(tSpend)}</td>
-                      <td className="reports-date-cell">{lastSaleDate || '-'}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   )
