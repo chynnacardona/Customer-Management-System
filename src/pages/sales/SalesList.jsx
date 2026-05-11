@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Search, ShoppingCart } from 'lucide-react'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import { getSales } from '../../services/salesProductApi'
 
 export default function SalesList() {
   const [sales, setSales] = useState([])
   const [search, setSearch] = useState('')
+  const [customerFilter, setCustomerFilter] = useState('ALL')
+  const [monthFilter, setMonthFilter] = useState('ALL')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -27,14 +30,34 @@ export default function SalesList() {
 
   const filteredSales = useMemo(() => {
     const term = search.toLowerCase().trim()
-    if (!term) return sales
 
-    return sales.filter((sale) =>
-      sale.transno?.toLowerCase().includes(term) ||
-      sale.custno?.toLowerCase().includes(term) ||
-      sale.customer?.custname?.toLowerCase().includes(term)
-    )
-  }, [sales, search])
+    return sales.filter((sale) => {
+      const saleMonth = String(sale.salesdate || '').slice(0, 7)
+      const matchesSearch =
+        !term ||
+        sale.transno?.toLowerCase().includes(term) ||
+        sale.custno?.toLowerCase().includes(term) ||
+        sale.customer?.custname?.toLowerCase().includes(term)
+      const matchesCustomer = customerFilter === 'ALL' || sale.custno === customerFilter
+      const matchesMonth = monthFilter === 'ALL' || saleMonth === monthFilter
+
+      return matchesSearch && matchesCustomer && matchesMonth
+    })
+  }, [customerFilter, monthFilter, sales, search])
+
+  const customerOptions = useMemo(() => {
+    const unique = new Map()
+    sales.forEach((sale) => {
+      unique.set(sale.custno, sale.customer?.custname || sale.custno)
+    })
+    return [...unique.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])))
+  }, [sales])
+
+  const monthOptions = useMemo(() => {
+    return [...new Set(sales.map((sale) => String(sale.salesdate || '').slice(0, 7)).filter(Boolean))]
+      .sort()
+      .reverse()
+  }, [sales])
 
   return (
     <>
@@ -124,6 +147,14 @@ export default function SalesList() {
           font-size: 12.5px;
         }
 
+        .sales-filters {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
         .sales-card {
           flex: 1;
           min-height: 0;
@@ -178,7 +209,7 @@ export default function SalesList() {
 
         .sales-table {
           width: 100%;
-          min-width: 760px;
+          min-width: 900px;
           height: 100%;
           border-collapse: collapse;
           display: flex;
@@ -228,11 +259,22 @@ export default function SalesList() {
 
         .sales-table th,
         .sales-table td {
-          padding: 13px 16px;
+          padding: 14px 20px;
           border-bottom: 1px solid rgba(100, 160, 255, 0.06);
           text-align: left;
           white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
+
+        .sales-table th:nth-child(1),
+        .sales-table td:nth-child(1) { width: 22%; }
+        .sales-table th:nth-child(2),
+        .sales-table td:nth-child(2) { width: 23%; }
+        .sales-table th:nth-child(3),
+        .sales-table td:nth-child(3) { width: 18%; }
+        .sales-table th:nth-child(4),
+        .sales-table td:nth-child(4) { width: 37%; }
 
         .sales-table th {
           position: relative;
@@ -250,6 +292,7 @@ export default function SalesList() {
         .sales-table td {
           color: rgba(180, 210, 255, 0.68);
           font-size: 12.5px;
+          line-height: 1.35;
         }
 
         .sales-table tbody tr {
@@ -270,6 +313,7 @@ export default function SalesList() {
         .sales-customer {
           color: rgba(235, 245, 255, 0.9) !important;
           font-weight: 700;
+          min-width: 0;
         }
 
         .sales-empty,
@@ -286,6 +330,7 @@ export default function SalesList() {
 
         @media (max-width: 780px) {
           .sales-search { min-width: 100%; }
+          .sales-filters { width: 100%; justify-content: stretch; }
         }
       `}</style>
 
@@ -299,9 +344,29 @@ export default function SalesList() {
             </div>
           </div>
 
-          <div className="sales-search">
-            <Search size={14} style={{ color: 'rgba(180, 210, 255, 0.28)' }} />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sales..." />
+          <div className="sales-filters">
+            <div className="sales-search">
+              <Search size={14} style={{ color: 'rgba(180, 210, 255, 0.28)' }} />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sales..." />
+            </div>
+            <FilterDropdown
+              label="Customer"
+              value={customerFilter}
+              onChange={setCustomerFilter}
+              options={[
+                { value: 'ALL', label: 'All Customers' },
+                ...customerOptions.map(([custno, label]) => ({ value: custno, label })),
+              ]}
+            />
+            <FilterDropdown
+              label="Month"
+              value={monthFilter}
+              onChange={setMonthFilter}
+              options={[
+                { value: 'ALL', label: 'All Months' },
+                ...monthOptions.map((month) => ({ value: month, label: month })),
+              ]}
+            />
           </div>
         </div>
 

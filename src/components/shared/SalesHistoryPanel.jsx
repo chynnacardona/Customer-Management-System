@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { ReceiptText } from 'lucide-react'
 import SalesDetailModal from './SalesDetailModal'
 import { getSalesDetail } from '../../services/salesProductApi'
+import { useCurrencyFormatter } from '../../utils/currency'
 
 function SalesHistoryPanel({ transactions }) {
+  const { formatCurrency } = useCurrencyFormatter()
   const [selectedTransaction, setSelectedTransaction] = useState(null)
   const [details, setDetails] = useState([]) 
   const [loadingDetail, setLoadingDetail] = useState(false)
@@ -91,7 +93,7 @@ function SalesHistoryPanel({ transactions }) {
                         <td>{new Date(ts.salesdate).toLocaleDateString()}</td>
                         <td>{ts.salesdetail?.length || 0} Items</td>
                         <td className="sales-history-total" style={{ fontWeight: 'bold', color: '#4ade80' }}>
-                          {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(rowTotal)}
+                          {formatCurrency(rowTotal)}
                         </td>
                       </tr>
                     );

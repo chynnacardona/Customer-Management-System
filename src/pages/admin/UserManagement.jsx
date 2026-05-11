@@ -9,6 +9,7 @@ import {
   UserCog,
   XCircle,
 } from 'lucide-react'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import { supabase } from '../../supabase/supabaseClient'
 
 const USER_SELECT = 'userId, email, full_name, user_type, record_status'
@@ -24,6 +25,8 @@ function getStatusTone(status) {
 function UserManagement() {
   const [users, setUsers] = useState([])
   const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [loading, setLoading] = useState(true)
   const [actionUserId, setActionUserId] = useState(null)
   const [error, setError] = useState('')
@@ -55,20 +58,25 @@ function UserManagement() {
 
   const filteredUsers = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return users
 
-    return users.filter((user) =>
-      [
-        user.userId,
-        user.full_name,
-        user.email,
-        user.user_type,
-        user.record_status,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-    )
-  }, [search, users])
+    return users.filter((user) => {
+      const matchesSearch =
+        !term ||
+        [
+          user.userId,
+          user.full_name,
+          user.email,
+          user.user_type,
+          user.record_status,
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(term))
+      const matchesRole = roleFilter === 'ALL' || user.user_type === roleFilter
+      const matchesStatus = statusFilter === 'ALL' || normalizeStatus(user.record_status) === statusFilter
+
+      return matchesSearch && matchesRole && matchesStatus
+    })
+  }, [roleFilter, search, statusFilter, users])
 
   const stats = useMemo(() => {
     const active = users.filter((user) => normalizeStatus(user.record_status) === 'ACTIVE').length
@@ -203,6 +211,14 @@ function UserManagement() {
           color: rgba(180, 210, 255, 0.24);
         }
 
+        .admin-filters {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
         .admin-stat-grid {
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -309,6 +325,21 @@ function UserManagement() {
           vertical-align: middle;
         }
 
+        .admin-users-table th.role-col,
+        .admin-users-table td.role-col,
+        .admin-users-table th.status-col,
+        .admin-users-table td.status-col,
+        .admin-users-table th.actions-col,
+        .admin-users-table td.actions-col {
+          text-align: center;
+        }
+
+        .admin-users-table td.role-col,
+        .admin-users-table td.status-col,
+        .admin-users-table td.actions-col {
+          white-space: nowrap;
+        }
+
         .admin-users-table tbody tr:last-child td {
           border-bottom: none;
         }
@@ -348,7 +379,9 @@ function UserManagement() {
         .admin-status-badge {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 6px;
+          min-width: 106px;
           min-height: 26px;
           padding: 0 9px;
           border-radius: 999px;
@@ -393,6 +426,7 @@ function UserManagement() {
         .admin-action-group {
           display: flex;
           align-items: center;
+          justify-content: center;
           gap: 7px;
           flex-wrap: wrap;
         }
@@ -441,7 +475,9 @@ function UserManagement() {
         .admin-protected-note {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 6px;
+          width: 100%;
           color: rgba(252, 211, 77, 0.76);
           font-size: 11.5px;
           font-weight: 700;
@@ -466,6 +502,11 @@ function UserManagement() {
             min-width: 100%;
           }
 
+          .admin-filters {
+            width: 100%;
+            justify-content: stretch;
+          }
+
           .admin-stat-grid {
             grid-template-columns: 1fr;
           }
@@ -484,12 +525,35 @@ function UserManagement() {
             </div>
           </div>
 
-          <div className="admin-search">
-            <Search size={14} />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search users, emails, roles..."
+          <div className="admin-filters">
+            <div className="admin-search">
+              <Search size={14} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search users, emails, roles..."
+              />
+            </div>
+            <FilterDropdown
+              label="Role"
+              value={roleFilter}
+              onChange={setRoleFilter}
+              options={[
+                { value: 'ALL', label: 'All Roles' },
+                { value: 'USER', label: 'USER' },
+                { value: 'ADMIN', label: 'ADMIN' },
+                { value: 'SUPERADMIN', label: 'SUPERADMIN' },
+              ]}
+            />
+            <FilterDropdown
+              label="Status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: 'ALL', label: 'All Status' },
+                { value: 'ACTIVE', label: 'Active' },
+                { value: 'INACTIVE', label: 'Inactive' },
+              ]}
             />
           </div>
         </div>
@@ -543,9 +607,9 @@ function UserManagement() {
                   <tr>
                     <th>User ID</th>
                     <th>Username</th>
-                    <th>User Type</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th className="role-col">User Type</th>
+                    <th className="status-col">Status</th>
+                    <th className="actions-col">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -565,19 +629,19 @@ function UserManagement() {
                             <span>{user.email || 'No email on file'}</span>
                           </div>
                         </td>
-                        <td>
+                        <td className="role-col">
                           <span className={`admin-role-badge ${roleTone}`}>
                             {isSuperadmin ? <ShieldCheck size={12} /> : <UserCog size={12} />}
                             {user.user_type || 'USER'}
                           </span>
                         </td>
-                        <td>
+                        <td className="status-col">
                           <span className={`admin-status-badge ${statusTone}`}>
                             {isActive ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
                             {normalizeStatus(user.record_status) || 'INACTIVE'}
                           </span>
                         </td>
-                        <td>
+                        <td className="actions-col">
                           {isSuperadmin ? (
                             <span
                               className="admin-protected-note"

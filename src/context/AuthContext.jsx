@@ -128,7 +128,16 @@ export const AuthProvider = ({ children }) => {
   }, [checkAndSetUser]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, handleLogin, signOut: () => supabase.auth.signOut() }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        handleLogin,
+        signOut: () => supabase.auth.signOut(),
+        signOutAllSessions: () => supabase.auth.signOut({ scope: 'global' }),
+        signOutOtherSessions: () => supabase.auth.signOut({ scope: 'others' }),
+      }}
+    >
       {loading ? (
         <div style={{
           minHeight: '100vh',

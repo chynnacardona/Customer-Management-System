@@ -1,12 +1,7 @@
 import { supabase } from '../supabase/supabaseClient'
+import { formatCurrencyValue } from '../utils/currency'
 
-const moneyFormatter = new Intl.NumberFormat('en-PH', {
-  style: 'currency',
-  currency: 'PHP',
-  maximumFractionDigits: 2,
-})
-
-export const formatCurrency = (value) => moneyFormatter.format(Number(value || 0))
+export const formatCurrency = formatCurrencyValue
 
 export const getReportValue = (row, ...keys) => {
   for (const key of keys) {

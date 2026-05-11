@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Eye, Edit, Trash2, Plus, UserCheck, Loader2, RotateCcw } from 'lucide-react'
 import AddCustomerModal from '../../components/shared/AddCustomerModal'
 import EditCustomerModal from '../../components/shared/EditCustomerModal'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import SoftDeleteConfirmDialog from '../../components/shared/SoftDeleteConfirmDialog'
 import { customerService } from '../../services/customerService'
 import { useRights } from '../../context/useRights'
@@ -12,6 +13,20 @@ import {
   canEditCustomer as canEditCustomerByRights,
   canManageDeletedCustomers,
 } from '../../utils/accessRules'
+
+function normalizeStatus(status) {
+  return String(status || '').toUpperCase()
+}
+
+function formatStamp(stamp) {
+  if (!stamp) return '-'
+
+  const raw = String(stamp)
+  const primary = raw.split(';')[0]?.trim() || raw
+  const readable = primary.replace(/^(\d{1,2}\/\d{1,2}):/, '$1 ').replaceAll(':', ':')
+
+  return readable.length > 18 ? `${readable.slice(0, 18)}...` : readable
+}
 
 function CustomerListPage() {
   const navigate = useNavigate()
@@ -29,6 +44,7 @@ function CustomerListPage() {
   const [error, setError] = useState('')
   
   const [search, setSearch] = useState('')
+  const [paytermFilter, setPaytermFilter] = useState('ALL')
   const [selectedRow, setSelectedRow] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
@@ -51,11 +67,15 @@ function CustomerListPage() {
     fetchFromDB()
   }, [fetchFromDB])
 
-  const filtered = customers.filter(c =>
-    c.custname?.toLowerCase().includes(search.toLowerCase()) ||
-    c.custno?.toLowerCase().includes(search.toLowerCase()) ||
-    c.payterm?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = customers.filter((customer) => {
+    const matchesSearch =
+      customer.custname?.toLowerCase().includes(search.toLowerCase()) ||
+      customer.custno?.toLowerCase().includes(search.toLowerCase()) ||
+      customer.payterm?.toLowerCase().includes(search.toLowerCase())
+    const matchesPayterm = paytermFilter === 'ALL' || customer.payterm === paytermFilter
+
+    return matchesSearch && matchesPayterm
+  })
 
   const handleSearch = (e) => {
     setSearch(e.target.value)
@@ -140,11 +160,34 @@ function CustomerListPage() {
         .data-table tbody tr { border-bottom: 1px solid rgba(126, 184, 255, 0.06); transition: background 0.18s ease, box-shadow 0.18s ease; cursor: pointer; }
         .data-table tbody tr:hover { background: rgba(126, 184, 255, 0.07); box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.75); }
         .data-table tbody td { padding: 12px 16px; font-size: 12.5px; color: rgba(180, 210, 255, 0.7); }
-        .data-table th.actions-col, .data-table td.actions-col { text-align: center; }
+        .data-table th.status-col,
+        .data-table td.status-col,
+        .data-table th.stamp-col,
+        .data-table td.stamp-col,
+        .data-table th.actions-col,
+        .data-table td.actions-col { text-align: center; }
         .custno-cell { font-family: monospace; font-size: 12px; color: rgba(180, 210, 255, 0.45); }
         .custname-cell { font-weight: 600; color: rgba(220, 235, 255, 0.9) !important; }
         .payterm-badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; border: 1px solid; }
-        .action-cell { display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .status-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          min-width: 82px;
+          font-size: 11px;
+          color: rgba(74, 222, 128, 0.86);
+        }
+        .status-badge.inactive {
+          color: rgba(248, 113, 113, 0.95);
+        }
+        .stamp-cell {
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .action-cell { display: flex; align-items: center; justify-content: center; gap: 6px; }
         .action-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid transparent; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: rgba(180, 210, 255, 0.3); transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease; }
         .action-btn:hover { transform: translateY(-1px) scale(1.05); }
         .action-btn.view:hover { color: #60a5fa; background: rgba(59, 130, 246, 0.1); }
@@ -166,6 +209,17 @@ function CustomerListPage() {
               <Search size={13} style={{ color: 'rgba(180, 210, 255, 0.25)' }} />
               <input placeholder="Search customers..." value={search} onChange={handleSearch} />
             </div>
+            <FilterDropdown
+              label="Pay term"
+              value={paytermFilter}
+              onChange={setPaytermFilter}
+              options={[
+                { value: 'ALL', label: 'All Pay Terms' },
+                { value: 'COD', label: 'COD' },
+                { value: '30D', label: '30D' },
+                { value: '45D', label: '45D' },
+              ]}
+            />
             {canRecoverDeleted && (
               <button className="action-btn-primary recover-link-btn" onClick={() => navigate('/deleted-customers')}>
                 <RotateCcw size={14} /> Recover Deleted Accounts
@@ -190,8 +244,8 @@ function CustomerListPage() {
                   <th>Customer Name</th>
                   <th>Address</th>
                   <th>Pay Term</th>
-                  <th>Status</th>
-                  {canSeeStamp && <th>Stamp</th>}
+                  <th className="status-col">Status</th>
+                  {canSeeStamp && <th className="stamp-col">Stamp</th>}
                   <th className="actions-col">Actions</th>
                 </tr>
               </thead>
@@ -224,14 +278,14 @@ function CustomerListPage() {
                             {customer.payterm}
                           </span>
                         </td>
-                        <td className="actions-col">
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(74, 222, 128, 0.8)' }}>
+                        <td className="status-col">
+                          <span className={`status-badge ${normalizeStatus(customer.record_status) === 'INACTIVE' ? 'inactive' : ''}`}>
                             <UserCheck size={11} />
                             {customer.record_status}
                           </span>
                         </td>
-                        {canSeeStamp && <td>{customer.stamp || '-'}</td>}
-                        <td>
+                        {canSeeStamp && <td className="stamp-col stamp-cell" title={customer.stamp || ''}>{formatStamp(customer.stamp)}</td>}
+                        <td className="actions-col">
                           <div className="action-cell">
                             <button className="action-btn view" onClick={(e) => handleViewClick(e, customer)}>
                               <Eye size={13} />

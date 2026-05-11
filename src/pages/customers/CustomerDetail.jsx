@@ -4,8 +4,10 @@ import { ArrowLeft, BadgeCheck, CreditCard, MapPin, UserRound, Loader2 } from 'l
 import SalesHistoryPanel from '../../components/shared/SalesHistoryPanel'
 import { getSalesByCustomer } from '../../services/salesProductApi' 
 import { supabase } from '../../supabase/supabaseClient'
+import { useCurrencyFormatter } from '../../utils/currency'
 
 function CustomerDetailPage() {
+  const { formatCurrency } = useCurrencyFormatter()
   const { custno } = useParams()
   const navigate = useNavigate()
 
@@ -69,10 +71,7 @@ function CustomerDetailPage() {
   return sum + transactionTotal;
 }, 0);
 
-const formattedTotal = new Intl.NumberFormat('en-PH', { 
-  style: 'currency', 
-  currency: 'PHP' 
-}).format(totalSpend);
+const formattedTotal = formatCurrency(totalSpend);
 
   if (loading) {
     return (

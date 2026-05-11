@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Save } from 'lucide-react'
+import FilterDropdown from './FilterDropdown'
 
 function EditCustomerModal({ isOpen, onClose, customer, onSubmit }) {
   const [form, setForm] = useState({
@@ -76,7 +77,7 @@ function EditCustomerModal({ isOpen, onClose, customer, onSubmit }) {
           border-radius: 20px;
           box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
           animation: modalIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-          overflow: hidden;
+          overflow: visible;
         }
 
         .modal-header {
@@ -155,6 +156,10 @@ function EditCustomerModal({ isOpen, onClose, customer, onSubmit }) {
 
         .form-input::placeholder { color: rgba(180, 210, 255, 0.2); }
 
+        .form-group .filter-dropdown {
+          width: 100%;
+        }
+
         .form-input:focus {
           border-color: rgba(80, 140, 255, 0.5);
           background: rgba(80, 140, 255, 0.06);
@@ -164,29 +169,6 @@ function EditCustomerModal({ isOpen, onClose, customer, onSubmit }) {
         .form-input:disabled {
           opacity: 0.4;
           cursor: not-allowed;
-        }
-
-        .form-select {
-          background: rgba(100, 160, 255, 0.04);
-          border: 1px solid rgba(100, 160, 255, 0.1);
-          border-radius: 10px;
-          color: white;
-          font-size: 13px;
-          padding: 9px 14px;
-          outline: none;
-          transition: all 0.2s ease;
-          width: 100%;
-          box-sizing: border-box;
-          cursor: pointer;
-          appearance: none;
-        }
-
-        .form-select option { background: #0a1628; color: white; }
-
-        .form-select:focus {
-          border-color: rgba(80, 140, 255, 0.5);
-          background: rgba(80, 140, 255, 0.06);
-          box-shadow: 0 0 0 3px rgba(60, 120, 255, 0.08);
         }
 
         .modal-footer {
@@ -292,16 +274,16 @@ function EditCustomerModal({ isOpen, onClose, customer, onSubmit }) {
 
             <div className="form-group">
               <label className="form-label">Pay Term</label>
-              <select
-                className="form-select"
-                name="payterm"
+              <FilterDropdown
+                label="Pay term"
                 value={form.payterm}
-                onChange={handleChange}
-              >
-                <option value="COD">COD</option>
-                <option value="30D">30D</option>
-                <option value="45D">45D</option>
-              </select>
+                onChange={(value) => setForm({ ...form, payterm: value })}
+                options={[
+                  { value: 'COD', label: 'COD' },
+                  { value: '30D', label: '30D' },
+                  { value: '45D', label: '45D' },
+                ]}
+              />
             </div>
 
             {error && <p className="modal-error">{error}</p>}

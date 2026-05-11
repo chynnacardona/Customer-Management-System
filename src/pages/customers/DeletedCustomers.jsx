@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Loader2, RotateCcw, Search, ShieldCheck, Trash2 } from 'lucide-react'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import { useAuth } from '../../context/useAuth'
 import { customerService } from '../../services/customerService'
 import { canManageDeletedCustomers } from '../../utils/accessRules'
@@ -7,6 +8,7 @@ import { canManageDeletedCustomers } from '../../utils/accessRules'
 function DeletedCustomers() {
   const { user } = useAuth()
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [recoveringCustno, setRecoveringCustno] = useState(null)
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -39,14 +41,19 @@ function DeletedCustomers() {
 
   const filteredCustomers = useMemo(() => {
     const term = search.toLowerCase().trim()
-    if (!term) return customers
 
-    return customers.filter((customer) =>
-      customer.custno.toLowerCase().includes(term) ||
-      customer.custname.toLowerCase().includes(term) ||
-      (customer.stamp || customer.record_status || '').toLowerCase().includes(term)
-    )
-  }, [customers, search])
+    return customers.filter((customer) => {
+      const status = String(customer.record_status || '').toUpperCase()
+      const matchesSearch =
+        !term ||
+        customer.custno.toLowerCase().includes(term) ||
+        customer.custname.toLowerCase().includes(term) ||
+        (customer.stamp || customer.record_status || '').toLowerCase().includes(term)
+      const matchesStatus = statusFilter === 'ALL' || status === statusFilter
+
+      return matchesSearch && matchesStatus
+    })
+  }, [customers, search, statusFilter])
 
   const handleRecover = async (customer) => {
     try {
@@ -78,6 +85,8 @@ function DeletedCustomers() {
           display: flex;
           flex-direction: column;
           gap: 18px;
+          height: 100%;
+          min-height: 0;
         }
 
         .deleted-header {
@@ -156,6 +165,13 @@ function DeletedCustomers() {
 
         .deleted-search input::placeholder {
           color: rgba(180, 210, 255, 0.24);
+        }
+
+        .deleted-filters {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
         }
 
         .deleted-access-card,
@@ -252,10 +268,17 @@ function DeletedCustomers() {
 
         .deleted-table-card {
           overflow: hidden;
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
         }
 
         .deleted-table-scroll {
+          flex: 1;
+          min-height: 0;
           overflow-x: auto;
+          overflow-y: auto;
         }
 
         .deleted-table {
@@ -313,6 +336,21 @@ function DeletedCustomers() {
           min-width: 280px;
         }
 
+        .deleted-status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 86px;
+          min-height: 26px;
+          border-radius: 999px;
+          border: 1px solid rgba(248, 113, 113, 0.22);
+          background: rgba(239, 68, 68, 0.1);
+          color: rgba(252, 165, 165, 0.96);
+          font-size: 10.5px;
+          font-weight: 900;
+          letter-spacing: 0.06em;
+        }
+
         .recover-btn {
           display: inline-flex;
           align-items: center;
@@ -360,6 +398,7 @@ function DeletedCustomers() {
 
         @media (max-width: 780px) {
           .deleted-search { min-width: 100%; }
+          .deleted-filters { width: 100%; }
           .deleted-summary-card {
             align-items: flex-start;
             flex-direction: column;
@@ -381,12 +420,24 @@ function DeletedCustomers() {
         {error && <div className="deleted-error">{error}</div>}
 
           {canViewDeletedCustomers && (
-            <div className="deleted-search">
-              <Search size={14} />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search customer number, name, stamp..."
+            <div className="deleted-filters">
+              <div className="deleted-search">
+                <Search size={14} />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search customer number, name, stamp..."
+                />
+              </div>
+              <FilterDropdown
+                label="Deleted status"
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={[
+                  { value: 'ALL', label: 'All Deleted' },
+                  { value: 'INACTIVE', label: 'Inactive' },
+                  { value: 'DELETED', label: 'Deleted' },
+                ]}
               />
             </div>
           )}
@@ -433,6 +484,7 @@ function DeletedCustomers() {
                       <tr>
                         <th>Cust No</th>
                         <th>Customer Name</th>
+                        <th>Status</th>
                         <th>Stamp</th>
                         <th>Action</th>
                       </tr>
@@ -442,6 +494,7 @@ function DeletedCustomers() {
                         <tr key={customer.custno}>
                           <td className="deleted-custno">{customer.custno}</td>
                           <td className="deleted-custname">{customer.custname}</td>
+                          <td><span className="deleted-status">{customer.record_status || 'INACTIVE'}</span></td>
                           <td className="deleted-stamp">{customer.stamp || customer.record_status || 'INACTIVE'}</td>
                           <td>
                             <button

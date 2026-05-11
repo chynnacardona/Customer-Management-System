@@ -1,10 +1,9 @@
 import { X, ReceiptText, Loader2 } from 'lucide-react'
+import { useCurrencyFormatter } from '../../utils/currency'
 
 function SalesDetailModal({ isOpen, onClose, transaction, details, isLoading, error }) {
+  const { formatCurrency } = useCurrencyFormatter()
   if (!isOpen || !transaction) return null
-
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(value)
 
   // Standardize variables from the database (lowercase keys)
   const transNo = transaction.transno || transaction.trans_no || "#";
