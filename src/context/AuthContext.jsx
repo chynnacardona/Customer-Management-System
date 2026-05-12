@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   const checkAndSetUser = useCallback(async (sessionUser) => {
     if (!sessionUser) {
       setUser(null);
-      return;
+      return false;
     }
 
     try {
@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }) => {
           title: 'Profile check failed',
           message: 'We could not verify your account status. Please try again.',
         });
-        return;
+        return false;
       }
 
       if (!userRow) {
@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }) => {
           title: 'Account profile missing',
           message: 'Your account profile is not ready yet. Please contact a Sales Manager.',
         });
-        return;
+        return false;
       }
 
       if (userRow.record_status !== 'ACTIVE') {
@@ -87,7 +87,7 @@ export const AuthProvider = ({ children }) => {
           title: 'Account pending activation',
           message: 'Registration successful. A Sales Manager needs to activate your account before you can sign in.',
         });
-        return;
+        return false;
       }
 
       setUser({ ...sessionUser, ...userRow });
@@ -97,14 +97,25 @@ export const AuthProvider = ({ children }) => {
         entityId: sessionUser.id,
         metadata: { method: 'session', role: userRow.user_type },
       });
+      return true;
     } catch {
       signOutWithNotice({
         tone: 'error',
         title: 'Profile check failed',
         message: 'We could not verify your account status. Please try again.',
       });
+      return false;
     }
   }, [signOutWithNotice]);
+
+  const refreshUser = useCallback(async (sessionUser) => {
+    setLoading(true);
+    try {
+      return await checkAndSetUser(sessionUser);
+    } finally {
+      setLoading(false);
+    }
+  }, [checkAndSetUser]);
 
   useEffect(() => {
     let mounted = true;
@@ -125,9 +136,12 @@ export const AuthProvider = ({ children }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // Supabase recommends not awaiting extra Supabase calls directly inside this callback.
+      setLoading(true);
       setTimeout(() => {
-        if (session?.user) checkAndSetUser(session.user);
-        else setUser(null);
+        Promise.resolve(session?.user ? checkAndSetUser(session.user) : setUser(null))
+          .finally(() => {
+            if (mounted) setLoading(false);
+          });
       }, 0);
     });
 
@@ -138,7 +152,7 @@ export const AuthProvider = ({ children }) => {
   }, [checkAndSetUser]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, handleLogin, signOut: () => supabase.auth.signOut() }}>
+    <AuthContext.Provider value={{ user, loading, handleLogin, refreshUser, signOut: () => supabase.auth.signOut() }}>
       {loading ? (
         <div style={{
           minHeight: '100vh',

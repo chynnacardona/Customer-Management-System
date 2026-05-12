@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from "../../supabase/supabaseClient";
+import { useAuth } from '../../context/useAuth'
 
 const isTwoFactorEnabled = (email) => {
   if (!email) return false
@@ -11,6 +12,7 @@ const isTwoFactorEnabled = (email) => {
 function Login() {
   const canvasRef = useRef(null)
   const navigate = useNavigate()
+  const { refreshUser } = useAuth()
 
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
@@ -59,18 +61,11 @@ function Login() {
 
     draw()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        if (!isTwoFactorEnabled(session.user?.email)) navigate('/dashboard');
-      }
-    });
-
   return () => {
     cancelAnimationFrame(animationId)
     window.removeEventListener('resize', handleResize)
-    subscription.unsubscribe()
   };
-}, [navigate]);
+}, []);
 
   
 
@@ -125,7 +120,8 @@ function Login() {
           setErrorMsg('A verification code was sent to your email.')
           return
         }
-        navigate('/dashboard')
+        const isProfileReady = await refreshUser(data.user)
+        if (isProfileReady) navigate('/dashboard', { replace: true })
       }
     } catch {
       setIsError(true)
@@ -153,7 +149,9 @@ function Login() {
         return
       }
 
-      navigate('/dashboard')
+      const { data: { user } } = await supabase.auth.getUser()
+      const isProfileReady = await refreshUser(user)
+      if (isProfileReady) navigate('/dashboard', { replace: true })
     } catch {
       setIsError(true)
       setErrorMsg('Unable to verify the code.')
