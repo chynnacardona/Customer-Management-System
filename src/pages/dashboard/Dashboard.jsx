@@ -106,7 +106,7 @@ function Dashboard() {
   const { user } = useAuth()
   const { formatCurrency } = useCurrencyFormatter()
   const [paytermFilter, setPaytermFilter] = useState('ALL')
-  const [selectedYear, setSelectedYear] = useState('2026')
+  const [selectedYear, setSelectedYear] = useState('2010')
   const [viewBy, setViewBy] = useState('MONTH')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
