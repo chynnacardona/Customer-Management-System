@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Loader2, Package, Boxes, Coins } from 'lucide-react'
+import { ChevronDown, ChevronUp, Search, Loader2, Package, Boxes, Coins } from 'lucide-react'
 import FilterDropdown from '../../components/shared/FilterDropdown'
 import { getProducts } from '../../services/salesProductApi'
 import { useCurrencyFormatter } from '../../utils/currency'
+
+const getCurrentPrice = (product) => Number(product.pricehist?.[0]?.unitprice || 0)
 
 function ProductCatalog() {
   const { formatCurrency } = useCurrencyFormatter()
   const [search, setSearch] = useState('')
   const [unitFilter, setUnitFilter] = useState('ALL')
+  const [priceSort, setPriceSort] = useState('ALL')
+  const [sortConfig, setSortConfig] = useState({ key: 'prodcode', direction: 'asc' })
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -33,20 +37,66 @@ function ProductCatalog() {
   // Memoized search logic for performance
   const filteredProducts = useMemo(() => {
     const term = search.toLowerCase().trim()
-    return products.filter((product) => {
+    const filtered = products.filter((product) => {
+      const currentPrice = getCurrentPrice(product)
+      const searchable = [
+        product.prodcode,
+        product.description,
+        product.unit,
+        currentPrice,
+        formatCurrency(currentPrice),
+      ]
+
       const matchesSearch =
         !term ||
-        product.prodcode.toLowerCase().includes(term) ||
-        product.description.toLowerCase().includes(term)
+        searchable.some((value) => String(value || '').toLowerCase().includes(term))
       const matchesUnit = unitFilter === 'ALL' || product.unit === unitFilter
 
       return matchesSearch && matchesUnit
     })
-  }, [search, products, unitFilter])
+
+    const sorted = [...filtered]
+    const direction = sortConfig.direction === 'asc' ? 1 : -1
+    sorted.sort((a, b) => {
+      if (priceSort !== 'ALL') {
+        return (getCurrentPrice(a) - getCurrentPrice(b)) * (priceSort === 'LOWEST' ? 1 : -1)
+      }
+
+      const aValue = sortConfig.key === 'currentPrice' ? getCurrentPrice(a) : a[sortConfig.key]
+      const bValue = sortConfig.key === 'currentPrice' ? getCurrentPrice(b) : b[sortConfig.key]
+
+      if (typeof aValue === 'number' || typeof bValue === 'number') {
+        return (Number(aValue || 0) - Number(bValue || 0)) * direction
+      }
+
+      return String(aValue || '').localeCompare(String(bValue || '')) * direction
+    })
+
+    return sorted
+  }, [formatCurrency, priceSort, products, search, sortConfig, unitFilter])
 
   const unitOptions = useMemo(() => {
     return [...new Set(products.map((product) => product.unit).filter(Boolean))].sort()
   }, [products])
+
+  const handleSort = (key) => {
+    setPriceSort('ALL')
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const renderSortLabel = (key, label) => {
+    const active = priceSort === 'ALL' && sortConfig.key === key
+    const SortIcon = sortConfig.direction === 'asc' ? ChevronUp : ChevronDown
+    return (
+      <>
+        <span>{label}</span>
+        {active && <SortIcon className="sort-side-icon" size={13} />}
+      </>
+    )
+  }
 
   return (
     <>
@@ -156,7 +206,8 @@ function ProductCatalog() {
           gap: 10px;
         }
 
-        .product-stat {
+        .product-stat,
+        .product-stat-filter {
           display: flex;
           align-items: center;
           gap: 10px;
@@ -170,10 +221,49 @@ function ProductCatalog() {
           transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
         }
 
-        .product-stat:hover {
+        .product-stat:hover,
+        .product-stat-filter:hover {
           transform: translateY(-2px);
           border-color: rgba(126, 184, 255, 0.24);
           box-shadow: 0 18px 38px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.07);
+        }
+
+        .product-stat-filter {
+          border-color: rgba(56, 189, 248, 0.18);
+        }
+
+        .product-stat-control {
+          min-width: 154px;
+        }
+
+        .product-stat-control .filter-dropdown-button {
+          min-height: 28px;
+          padding: 0 9px;
+        }
+
+        .product-sort-btn {
+          border: none;
+          background: transparent;
+          color: inherit;
+          font: inherit;
+          text-transform: inherit;
+          letter-spacing: inherit;
+          cursor: pointer;
+          padding: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+        }
+
+        .product-sort-btn:hover {
+          color: rgba(224, 242, 254, 0.96);
+        }
+
+        .sort-side-icon {
+          color: rgba(56, 189, 248, 0.95);
+          flex-shrink: 0;
+          stroke-width: 2.8;
         }
 
         .product-stat-label {
@@ -299,7 +389,7 @@ function ProductCatalog() {
           position: relative;
           z-index: 1;
           padding: 12px 16px;
-          text-align: left;
+          text-align: center;
           font-size: 10px;
           font-weight: 700;
           color: rgba(180, 210, 255, 0.35);
@@ -316,6 +406,7 @@ function ProductCatalog() {
           padding: 13px 16px;
           font-size: 12.5px;
           color: rgba(180, 210, 255, 0.68);
+          text-align: center;
           white-space: nowrap;
           border-bottom: 1px solid rgba(100, 160, 255, 0.05);
         }
@@ -357,7 +448,7 @@ function ProductCatalog() {
         .price-cell {
           color: rgba(235, 245, 255, 0.92) !important;
           font-weight: 800;
-          text-align: right;
+          text-align: center;
           font-variant-numeric: tabular-nums;
         }
 
@@ -401,15 +492,6 @@ function ProductCatalog() {
                 placeholder="Search products..." 
               />
             </div>
-            <FilterDropdown
-              label="Unit"
-              value={unitFilter}
-              onChange={setUnitFilter}
-              options={[
-                { value: 'ALL', label: 'All Units' },
-                ...unitOptions.map((unit) => ({ value: unit, label: unit })),
-              ]}
-            />
           </div>
         </div>
 
@@ -418,13 +500,36 @@ function ProductCatalog() {
             <Boxes size={17} />
             <div><span className="product-stat-label">Products</span><span className="product-stat-value">{filteredProducts.length}</span></div>
           </div>
-          <div className="product-stat">
+          <div className="product-stat-filter">
             <Coins size={17} />
-            <div><span className="product-stat-label">Highest Price</span><span className="product-stat-value">{formatCurrency(Math.max(0, ...filteredProducts.map((product) => product.pricehist?.[0]?.unitprice || 0)))}</span></div>
+            <div className="product-stat-control">
+              <span className="product-stat-label">Price Order</span>
+              <FilterDropdown
+                label="Price"
+                value={priceSort}
+                onChange={setPriceSort}
+                options={[
+                  { value: 'ALL', label: 'Default' },
+                  { value: 'HIGHEST', label: 'Highest First' },
+                  { value: 'LOWEST', label: 'Lowest First' },
+                ]}
+              />
+            </div>
           </div>
-          <div className="product-stat">
+          <div className="product-stat-filter">
             <Package size={17} />
-            <div><span className="product-stat-label">View Mode</span><span className="product-stat-value">Read Only</span></div>
+            <div className="product-stat-control">
+              <span className="product-stat-label">Units</span>
+              <FilterDropdown
+                label="Unit"
+                value={unitFilter}
+                onChange={setUnitFilter}
+                options={[
+                  { value: 'ALL', label: 'All Units' },
+                  ...unitOptions.map((unit) => ({ value: unit, label: unit })),
+                ]}
+              />
+            </div>
           </div>
         </div>
 
@@ -443,16 +548,15 @@ function ProductCatalog() {
               <table className="product-table">
                 <thead>
                   <tr>
-                    <th>Prod Code</th>
-                    <th>Description</th>
-                    <th>Unit</th>
-                    <th style={{ textAlign: 'right' }}>Current Price</th>
+                    <th><button type="button" className="product-sort-btn" onClick={() => handleSort('prodcode')}>{renderSortLabel('prodcode', 'Prod Code')}</button></th>
+                    <th><button type="button" className="product-sort-btn" onClick={() => handleSort('description')}>{renderSortLabel('description', 'Description')}</button></th>
+                    <th><button type="button" className="product-sort-btn" onClick={() => handleSort('unit')}>{renderSortLabel('unit', 'Unit')}</button></th>
+                    <th><button type="button" className="product-sort-btn" onClick={() => handleSort('currentPrice')}>{renderSortLabel('currentPrice', 'Current Price')}</button></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredProducts.map((product) => {
-                    const latestPriceEntry = product.pricehist?.[0]
-                    const currentPrice = latestPriceEntry?.unitprice || 0
+                    const currentPrice = getCurrentPrice(product)
 
                     return (
                       <tr key={product.prodcode}>

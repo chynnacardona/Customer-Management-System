@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Package, Search, ShoppingCart, Wallet } from 'lucide-react'
+import { ChevronDown, ChevronUp, Loader2, Package, Search, ShoppingCart, Wallet } from 'lucide-react'
 import FilterDropdown from '../../components/shared/FilterDropdown'
 import {
   getProductRevenue,
@@ -14,6 +14,7 @@ function ProductRevenue() {
   const [search, setSearch] = useState('')
   const [unitFilter, setUnitFilter] = useState('ALL')
   const [revenueFilter, setRevenueFilter] = useState('ALL')
+  const [sortConfig, setSortConfig] = useState({ key: 'totalRevenue', direction: 'desc' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -36,11 +37,12 @@ function ProductRevenue() {
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase()
 
-    return rows.filter((row) => {
+    const filtered = rows.filter((row) => {
       const revenue = Number(getReportValue(row, 'totalRevenue', 'totalrevenue') || 0)
+      const quantity = Number(getReportValue(row, 'totalQtySold', 'totalqtysold', 'total_units_sold') || 0)
       const matchesSearch =
         !term ||
-        [row.prodCode, row.prodcode, row.description, row.unit]
+        [row.prodCode, row.prodcode, row.description, row.unit, quantity, revenue, formatCurrency(revenue)]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(term))
       const matchesUnit = unitFilter === 'ALL' || row.unit === unitFilter
@@ -51,7 +53,25 @@ function ProductRevenue() {
 
       return matchesSearch && matchesUnit && matchesRevenue
     })
-  }, [revenueFilter, rows, search, unitFilter])
+
+    const direction = sortConfig.direction === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      const getValue = (row) => {
+        if (sortConfig.key === 'prodCode') return getReportValue(row, 'prodCode', 'prodcode')
+        if (sortConfig.key === 'totalQtySold') return Number(getReportValue(row, 'totalQtySold', 'totalqtysold', 'total_units_sold') || 0)
+        if (sortConfig.key === 'totalRevenue') return Number(getReportValue(row, 'totalRevenue', 'totalrevenue', 'total_revenue') || 0)
+        return row[sortConfig.key]
+      }
+      const aValue = getValue(a)
+      const bValue = getValue(b)
+
+      if (typeof aValue === 'number' || typeof bValue === 'number') {
+        return (Number(aValue || 0) - Number(bValue || 0)) * direction
+      }
+
+      return String(aValue || '').localeCompare(String(bValue || '')) * direction
+    })
+  }, [formatCurrency, revenueFilter, rows, search, sortConfig, unitFilter])
 
   const unitOptions = useMemo(() => {
     return [...new Set(rows.map((row) => row.unit).filter(Boolean))].sort()
@@ -59,16 +79,34 @@ function ProductRevenue() {
 
   const stats = useMemo(() => {
     // UPDATED: Now uses 'total_units_sold' and 'total_revenue'
-    const totalQty = rows.reduce(
+    const totalQty = filteredRows.reduce(
       (sum, row) => sum + Number(getReportValue(row, 'totalQtySold', 'total_units_sold') || 0),
       0
     )
-    const totalRevenue = rows.reduce(
+    const totalRevenue = filteredRows.reduce(
       (sum, row) => sum + Number(getReportValue(row, 'totalRevenue', 'total_revenue') || 0),
       0
     )
-    return { productCount: rows.length, totalQty, totalRevenue }
-  }, [rows])
+    return { productCount: filteredRows.length, totalQty, totalRevenue }
+  }, [filteredRows])
+
+  const handleSort = (key) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const sortLabel = (key, label) => {
+    const active = sortConfig.key === key
+    const SortIcon = sortConfig.direction === 'asc' ? ChevronUp : ChevronDown
+    return (
+      <>
+        <span>{label}</span>
+        {active && <SortIcon className="sort-side-icon" size={13} />}
+      </>
+    )
+  }
 
   return (
     <div className="reports-page">
@@ -151,11 +189,11 @@ function ProductRevenue() {
             <table className="reports-table">
               <thead>
                 <tr>
-                  <th>Product Code</th>
-                  <th>Description</th>
-                  <th className="reports-align-center">Unit</th>
-                  <th className="reports-align-center">Total Qty Sold</th>
-                  <th className="reports-align-center">Total Revenue</th>
+                  <th><button type="button" className="reports-sort-btn" onClick={() => handleSort('prodCode')}>{sortLabel('prodCode', 'Product Code')}</button></th>
+                  <th><button type="button" className="reports-sort-btn" onClick={() => handleSort('description')}>{sortLabel('description', 'Description')}</button></th>
+                  <th className="reports-align-center"><button type="button" className="reports-sort-btn" onClick={() => handleSort('unit')}>{sortLabel('unit', 'Unit')}</button></th>
+                  <th className="reports-align-center"><button type="button" className="reports-sort-btn" onClick={() => handleSort('totalQtySold')}>{sortLabel('totalQtySold', 'Total Qty Sold')}</button></th>
+                  <th className="reports-align-center"><button type="button" className="reports-sort-btn" onClick={() => handleSort('totalRevenue')}>{sortLabel('totalRevenue', 'Total Revenue')}</button></th>
                 </tr>
               </thead>
               <tbody>

@@ -1,9 +1,11 @@
-import React, { useCallback, useState, useEffect } from 'react'
+import React, { useCallback, useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Eye, Edit, UserCheck, Loader2, X, ChevronLeft, Trash2 } from 'lucide-react'
+import { Search, Edit, UserCheck, Loader2, X, ChevronLeft, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { supabase } from '../../supabase/supabaseClient'
 import AddCustomerModal from '../../components/shared/AddCustomerModal'
 import EditCustomerModal from '../../components/shared/EditCustomerModal'
+import SoftDeleteConfirmDialog from '../../components/shared/SoftDeleteConfirmDialog'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import { customerService } from '../../services/customerService'
 import { useAuth } from '../../context/useAuth' 
 import { useRights } from '../../context/useRights'
@@ -11,6 +13,13 @@ import {
   canAddCustomer as canAddCustomerByRights,
   canEditCustomer as canEditCustomerByRights,
 } from '../../utils/accessRules'
+import {
+  appendCustomerStampEntry,
+  buildActorSnapshot,
+  createCustomerStampEntry,
+  decodeStampPayload,
+  resolveStampActor,
+} from '../../utils/stampAudit'
 
 function CustomerListPage() {
   const navigate = useNavigate()
@@ -18,16 +27,15 @@ function CustomerListPage() {
   const { rights, userType: rightsUserType } = useRights()
 
   // Identification and Permissions logic
-  const metadataName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.name
-  const databaseName = authUser?.full_name && authUser.full_name.toLowerCase() !== 'admin user' ? authUser.full_name : ''
-  const actualDisplayName = databaseName || metadataName || authUser?.email?.split('@')?.[0] || 'System User'
-  const actualEmail = authUser?.email ?? 'admin@hope.com'
   const userRole = (rightsUserType ?? authUser?.user_type ?? 'USER').toUpperCase()
+  const actorSnapshot = useMemo(
+    () => buildActorSnapshot({ authUser, userRole }),
+    [authUser, userRole]
+  )
 
   // Strict Role Checks
   const isSuperAdmin = userRole === 'SUPERADMIN'
   const isAdmin = userRole === 'ADMIN'
-  const isUser = userRole === 'USER'
 
   // Action Visibility Logic
   const canSeeAuditHistory = isSuperAdmin || isAdmin
@@ -40,26 +48,33 @@ function CustomerListPage() {
   const [customers, setCustomers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [paytermFilter, setPaytermFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [sortConfig, setSortConfig] = useState({ key: 'custno', direction: 'asc' })
   const [selectedRowId, setSelectedRowId] = useState(null)
   const [timeFilter, setTimeFilter] = useState('ALL')
+  const [pageError, setPageError] = useState('')
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState(null)
+  const [deletingCustomer, setDeletingCustomer] = useState(null)
   const [logModal, setLogModal] = useState({ 
     isOpen: false, 
     history: [], 
     view: 'list', 
     selectedEntry: null, 
-    rawStampData: '' 
+    rawStampData: '',
+    customerId: null,
   });
 
   const fetchCustomersFromDatabase = useCallback(async () => {
     try {
       setIsLoading(true)
+      setPageError('')
       const customerData = await customerService.getCustomers(userRole)
       setCustomers(customerData || [])
-    } catch (error) { 
-      console.error("Fetch error:", error) 
+    } catch (error) {
+      setPageError(error.message || 'Unable to load customers.')
     } finally { 
       setIsLoading(false) 
     }
@@ -69,71 +84,156 @@ function CustomerListPage() {
     fetchCustomersFromDatabase() 
   }, [fetchCustomersFromDatabase])
 
-  const filteredCustomers = customers.filter(customer =>
-    (customer.custname || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (customer.custno || '').toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  useEffect(() => {
+    return customerService.subscribeToCustomerChanges(() => {
+      fetchCustomersFromDatabase()
+    })
+  }, [fetchCustomersFromDatabase])
 
-  const handleHistoryClick = async (event, stampString, filterType = 'ALL') => {
+  const paytermOptions = useMemo(() => {
+    return [...new Set(customers.map((customer) => customer.payterm).filter(Boolean))].sort()
+  }, [customers])
+
+  const statusOptions = useMemo(() => {
+    return [...new Set(customers.map((customer) => String(customer.record_status || '').toUpperCase()).filter(Boolean))].sort()
+  }, [customers])
+
+  const filteredCustomers = useMemo(() => {
+    const term = searchQuery.toLowerCase().trim()
+    const filtered = customers.filter((customer) => {
+      const status = String(customer.record_status || '').toUpperCase()
+      const searchable = [
+        customer.custno,
+        customer.custname,
+        customer.payterm,
+        customer.address,
+        customer.record_status,
+        customer.stamp,
+      ]
+      const matchesSearch =
+        !term ||
+        searchable.some((value) => String(value || '').toLowerCase().includes(term))
+      const matchesPayterm = paytermFilter === 'ALL' || customer.payterm === paytermFilter
+      const matchesStatus = statusFilter === 'ALL' || status === statusFilter
+
+      return matchesSearch && matchesPayterm && matchesStatus
+    })
+
+    const direction = sortConfig.direction === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) =>
+      String(a[sortConfig.key] || '').localeCompare(String(b[sortConfig.key] || '')) * direction
+    )
+  }, [customers, paytermFilter, searchQuery, sortConfig, statusFilter])
+
+  const handleSort = (key) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const sortLabel = (key, label) => {
+    const active = sortConfig.key === key
+    const SortIcon = sortConfig.direction === 'asc' ? ChevronUp : ChevronDown
+    return (
+      <>
+        <span>{label}</span>
+        {active && <SortIcon className="sort-side-icon" size={13} />}
+      </>
+    )
+  }
+
+  const buildHistoryFromStamp = useCallback(async (stampString, filterType = 'ALL') => {
+    if (!stampString || stampString === '-' || stampString.trim() === '') {
+      return []
+    }
+
+    const historyEntries = stampString.split(';').filter(Boolean);
+    const uniqueUserPrefixes = [...new Set(historyEntries.map(entry => entry.split(':')[5]).filter(Boolean))];
+
+    const { data: fetchedUsers } = uniqueUserPrefixes.length > 0
+      ? await supabase
+        .from('user')
+        .select('full_name, email')
+        .or(uniqueUserPrefixes.map(prefix => `email.ilike.${prefix}%`).join(','))
+      : { data: [] };
+
+    const currentTime = new Date();
+
+    return historyEntries.map(entry => {
+      const segments = entry.split(':');
+      const dateSegments = segments[0].split('/');
+      const entryDateObject = new Date(2026, parseInt(dateSegments[0]) - 1, parseInt(dateSegments[1]));
+      const userCode = segments[5];
+      const actorData = decodeStampPayload(segments[9]);
+      const matchedDatabaseUser = fetchedUsers?.find(user => user.email.toLowerCase().startsWith(userCode?.toLowerCase()));
+      const actor = resolveStampActor({ segments, actorData, matchedDatabaseUser })
+
+      const rawDescription = segments[7] || '';
+      const legacyMapping = { 'N': 'Name Update', 'A': 'Address Update', 'P': 'Pay Term Update', 'C': 'Record Creation', 'G': 'General Update' };
+      const finalDescription = legacyMapping[rawDescription] || rawDescription || 'Record Update';
+
+      return {
+        displayDate: `${segments[0]}/26`,
+        entryDateObject: entryDateObject,
+        militaryTime: segments.slice(1, 4).join(':'),
+        actionType: segments[4] === 'C' ? 'Created' : 'Updated',
+        userName: actor.name,
+        userEmail: actor.email,
+        systemRole: actor.role,
+        modificationDescription: finalDescription,
+        previousRowSnapshot: decodeStampPayload(segments[8])
+      };
+    }).filter(item => {
+      if (filterType === 'ALL') return true;
+      const diffDays = (currentTime - item.entryDateObject) / (1000 * 60 * 60 * 24);
+      if (filterType === 'WEEK') return diffDays <= 7;
+      if (filterType === 'MONTH') return diffDays <= 30;
+      if (filterType === 'YEAR') return diffDays <= 365;
+      return true;
+    });
+  }, [])
+
+  const handleHistoryClick = async (event, stampString, filterType = 'ALL', customerId = null) => {
     if (event) event.stopPropagation();
     
     if (!stampString || stampString === '-' || stampString.trim() === '') {
-      setLogModal({ isOpen: true, history: [], view: 'list', selectedEntry: null, rawStampData: stampString });
+      setLogModal({ isOpen: true, history: [], view: 'list', selectedEntry: null, rawStampData: stampString, customerId });
       return;
     }
 
-    const historyEntries = stampString.split(';');
-    const uniqueUserPrefixes = [...new Set(historyEntries.map(entry => entry.split(':')[5]))];
-
     try {
-      const { data: fetchedUsers } = await supabase
-        .from('user')
-        .select('full_name, email')
-        .or(uniqueUserPrefixes.map(prefix => `email.ilike.${prefix}%`).join(','));
-
-      const currentTime = new Date();
-      const processedHistory = historyEntries.map(entry => {
-        const segments = entry.split(':');
-        const dateSegments = segments[0].split('/');
-        const entryDateObject = new Date(2026, parseInt(dateSegments[0]) - 1, parseInt(dateSegments[1]));
-        
-        const userCode = segments[5];
-        const isCurrentUser = actualEmail.toLowerCase().startsWith(userCode?.toLowerCase());
-        const matchedDatabaseUser = fetchedUsers?.find(user => user.email.toLowerCase().startsWith(userCode?.toLowerCase()));
-
-        const rawDescription = segments[7] || '';
-        const legacyMapping = { 'N': 'Name Update', 'A': 'Address Update', 'P': 'Pay Term Update', 'C': 'Record Creation', 'G': 'General Update' };
-        const finalDescription = legacyMapping[rawDescription] || rawDescription || 'Record Update';
-
-        let snapshotData = null;
-        if (segments[8]) {
-            try { snapshotData = JSON.parse(atob(segments[8])); } catch(e) { console.error("Snapshot error", e); }
-        }
-
-        return {
-          displayDate: `${segments[0]}/26`,
-          entryDateObject: entryDateObject,
-          militaryTime: segments.slice(1, 4).join(':'),
-          actionType: segments[4] === 'C' ? 'Created' : 'Updated',
-          userName: isCurrentUser ? actualDisplayName : (matchedDatabaseUser?.full_name || `User (${userCode})`),
-          userEmail: isCurrentUser ? actualEmail : (matchedDatabaseUser?.email || `${userCode}@hope.com`),
-          systemRole: segments[6] === 'S' ? 'SUPERADMIN' : (segments[6] === 'A' ? 'ADMIN' : 'USER'),
-          modificationDescription: finalDescription,
-          previousRowSnapshot: snapshotData
-        };
-      }).filter(item => {
-        if (filterType === 'ALL') return true;
-        const diffDays = (currentTime - item.entryDateObject) / (1000 * 60 * 60 * 24);
-        if (filterType === 'WEEK') return diffDays <= 7;
-        if (filterType === 'MONTH') return diffDays <= 30;
-        if (filterType === 'YEAR') return diffDays <= 365;
-        return true;
-      });
-
-      setLogModal({ isOpen: true, history: processedHistory, view: 'list', selectedEntry: null, rawStampData: stampString });
+      const processedHistory = await buildHistoryFromStamp(stampString, filterType);
+      setLogModal({ isOpen: true, history: processedHistory, view: 'list', selectedEntry: null, rawStampData: stampString, customerId });
       setTimeFilter(filterType);
-    } catch (databaseError) { console.error(databaseError); }
+    } catch {
+      setLogModal({ isOpen: true, history: [], view: 'list', selectedEntry: null, rawStampData: stampString, customerId });
+    }
   };
+
+  useEffect(() => {
+    if (!logModal.isOpen || !logModal.customerId) return
+
+    const currentCustomer = customers.find((customer) => customer.custno === logModal.customerId)
+    if (!currentCustomer || currentCustomer.stamp === logModal.rawStampData) return
+
+    let cancelled = false
+    buildHistoryFromStamp(currentCustomer.stamp, timeFilter).then((history) => {
+      if (!cancelled) {
+        setLogModal((current) => ({
+          ...current,
+          history,
+          rawStampData: currentCustomer.stamp,
+          selectedEntry: null,
+          view: 'list',
+        }))
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [buildHistoryFromStamp, customers, logModal.customerId, logModal.isOpen, logModal.rawStampData, timeFilter])
 
   const handleUpdateCustomer = async (customerNumber, payload) => {
     try {
@@ -149,54 +249,105 @@ function CustomerListPage() {
         : 'General Update';
 
       const { stamp: _, ...dataToSnapshot } = currentCustomerState;
-      const base64Snapshot = btoa(JSON.stringify(dataToSnapshot)); 
-
-      const now = new Date();
-      const monthDayString = `${now.getMonth() + 1}/${now.getDate()}`;
-      const timeString = now.toLocaleTimeString('en-GB', { hour12: false }); 
-      const userPrefix = actualEmail.split('@')[0].substring(0, 3);
-      
-      const newHistoryEntry = `${monthDayString}:${timeString}:U:${userPrefix}:${userRole[0]}:${changeDescription}:${base64Snapshot}`;
-      const existingHistoryEntries = currentCustomerState?.stamp && currentCustomerState.stamp !== '-' ? currentCustomerState.stamp.split(';') : [];
-        
-      const updatedStampString = [newHistoryEntry, ...existingHistoryEntries].join(';');
+      const newHistoryEntry = createCustomerStampEntry({
+        actionType: 'U',
+        actor: actorSnapshot,
+        description: changeDescription,
+        previousSnapshot: dataToSnapshot,
+      })
+      const updatedStampString = appendCustomerStampEntry(currentCustomerState?.stamp, newHistoryEntry)
 
       await customerService.updateCustomer(customerNumber, { ...payload, stamp: updatedStampString });
       await fetchCustomersFromDatabase();
       setEditingCustomer(null);
-    } catch (e) { console.error(e); }
+    } catch (error) {
+      setPageError(error.message || 'Unable to update customer.')
+    }
   }
 
   const handleAddCustomer = async (payload) => {
-    const now = new Date();
-    const monthDayString = `${now.getMonth() + 1}/${now.getDate()}`;
-    const timeString = now.toLocaleTimeString('en-GB', { hour12: false });
-    const userPrefix = actualEmail.split('@')[0].substring(0, 3);
-    const initialStamp = `${monthDayString}:${timeString}:C:${userPrefix}:${userRole[0]}:Record Created:`;
+    const initialStamp = createCustomerStampEntry({
+      actionType: 'C',
+      actor: actorSnapshot,
+      description: 'Record Created',
+    })
     await customerService.addCustomer({ ...payload, stamp: initialStamp });
     await fetchCustomersFromDatabase();
+  }
+
+  const handleSoftDeleteCustomer = async (customer) => {
+    const { stamp: _, ...dataToSnapshot } = customer
+    const deleteStampEntry = createCustomerStampEntry({
+      actionType: 'U',
+      actor: actorSnapshot,
+      description: 'Soft Deleted',
+      previousSnapshot: dataToSnapshot,
+    })
+    const updatedStampString = appendCustomerStampEntry(customer.stamp, deleteStampEntry)
+
+    await customerService.softDeleteCustomer(customer.custno, updatedStampString)
+    await fetchCustomersFromDatabase()
   }
 
   return (
     <>
       <style>{`
-        .customer-list-page { height: 100vh; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; background: #020617; overflow: hidden; }
-        .page-header { flex: 0 0 auto; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .table-frame { flex: 1; display: flex; flex-direction: column; background: #0b1224; border: 1px solid rgba(126, 184, 255, 0.12); border-radius: 12px; overflow: hidden; }
-        .scroll-container { flex: 1; overflow-y: auto; overflow-x: auto; }
+        @keyframes customerPageIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes customerCardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .customer-list-page { animation: customerPageIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards; height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 18px; overflow: hidden; }
+        .page-header { flex: 0 0 auto; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+        .customer-title { color: white; margin: 0; font-size: 20px; line-height: 1; font-weight: 800; }
+        .customer-subtitle { color: rgba(180, 210, 255, 0.35); font-size: 12px; margin: 6px 0 0; }
+        .customer-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: nowrap; max-width: none; }
+        .customer-toolbar .filter-dropdown { flex: 0 0 148px; }
+        .customer-search { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 240px; max-width: 320px; background: rgba(126, 184, 255, 0.04); border: 1px solid rgba(126, 184, 255, 0.12); border-radius: 10px; padding: 8px 12px; transition: all 0.2s ease; }
+        .customer-search:focus-within { border-color: rgba(56, 189, 248, 0.34); background: rgba(126, 184, 255, 0.07); box-shadow: 0 0 0 3px rgba(46, 134, 245, 0.1); }
+        .customer-search input { width: 100%; border: none; outline: none; background: transparent; color: rgba(220, 235, 255, 0.86); font-size: 12.5px; }
+        .customer-search input::placeholder { color: rgba(180, 210, 255, 0.28); }
+        .customer-btn {
+          min-height: 44px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          padding: 0 16px;
+          cursor: pointer;
+          font-size: 11px;
+          line-height: 1.15;
+          font-weight: 850;
+          text-align: center;
+          white-space: normal;
+          border: 1px solid transparent;
+          transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+        }
+        .customer-btn:hover { box-shadow: 0 10px 24px rgba(37, 99, 235, 0.16); }
+        .customer-btn.recover { background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.22); color: rgba(134, 239, 172, 0.95); }
+        .customer-btn.add { background: linear-gradient(135deg, #2563eb, #38bdf8); color: white; box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22); }
+        .customer-error { padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(248, 113, 113, 0.2); background: rgba(239, 68, 68, 0.08); color: rgba(252, 165, 165, 0.95); font-size: 12.5px; }
+        .table-frame { flex: 1; min-height: 0; display: flex; flex-direction: column; background: linear-gradient(180deg, rgba(126, 184, 255, 0.035), transparent 44%), linear-gradient(145deg, rgba(8, 18, 40, 0.84), rgba(3, 9, 24, 0.9)); border: 1px solid rgba(126, 184, 255, 0.12); border-radius: 18px; overflow: hidden; box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.045); animation: customerCardIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .scroll-container { flex: 1; min-height: 0; overflow-y: auto; overflow-x: auto; scrollbar-width: thin; scrollbar-color: rgba(126, 184, 255, 0.45) rgba(8, 18, 40, 0.28); }
         
-        .c-table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 1000px; }
-        .c-table thead { position: sticky; top: 0; z-index: 10; background: #111a2e; }
-        .c-table th { padding: 12px 10px; text-align: left; font-size: 10px; color: white !important; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 850; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .c-table td { padding: 10px; font-size: 12.5px; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.02); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .c-table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 1080px; }
+        .c-table thead { position: sticky; top: 0; z-index: 10; background: rgba(6, 16, 36, 0.96); backdrop-filter: blur(12px); }
+        .c-table th { padding: 12px 16px; text-align: center; font-size: 10px; color: rgba(180, 210, 255, 0.35) !important; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 800; border-bottom: 1px solid rgba(100, 160, 255, 0.08); }
+        .c-table td { padding: 13px 16px; text-align: center; font-size: 12.5px; color: rgba(180, 210, 255, 0.68); border-bottom: 1px solid rgba(100, 160, 255, 0.05); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .c-table tbody tr { transition: background 0.18s ease, box-shadow 0.18s ease; cursor: pointer; }
+        .c-table tbody tr:hover { background: rgba(126, 184, 255, 0.07); box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.75); }
+        .customer-sort-btn { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+        .customer-sort-btn:hover { color: rgba(224, 242, 254, 0.96); }
+        .sort-side-icon { color: rgba(56, 189, 248, 0.95); flex-shrink: 0; stroke-width: 2.8; }
         
         /* Width adjustments and centering */
-        .col-id { width: 65px; } 
+        .col-id { width: 96px; } 
         .col-name { width: 220px; } 
         .col-pay { width: 60px; text-align: center; } 
-        .col-status { width: 100px; } 
+        .col-status { width: 120px; text-align: center; } 
         .col-hist { width: 120px; text-align: center; }
-        .col-actions { width: 120px; text-align: center; }
+        .col-actions { width: 132px; text-align: center; }
+        .col-status-cell,
+        .col-hist,
+        .col-actions { text-align: center; }
+        .id-cell { overflow: visible !important; text-overflow: clip !important; letter-spacing: 0.02em; }
 
         .action-container { 
             display: flex; 
@@ -204,56 +355,278 @@ function CustomerListPage() {
             justify-content: center; 
             gap: 12px; 
             width: 100%; 
-            padding-right: 10px; /* Slight offset for perfect optical centering */
+            padding-right: 0;
         }
 
-        .history-btn { background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 10px; font-weight: 700; text-transform: lowercase; }
-        .log-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-        .log-modal { background: #0b1224; border: 1px solid #1e293b; width: 380px; height: 550px; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; position: relative; }
-        .filter-bar { display: flex; gap: 8px; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 10px; }
-        .filter-btn { background: none; border: none; color: #475569; font-size: 10px; font-weight: 800; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
-        .filter-btn.active { color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
-        .log-stack { flex: 1; overflow-y: auto; padding-right: 4px; margin-top: 10px; display: flex; flex-direction: column; gap: 12px; }
-        .log-stack::-webkit-scrollbar { width: 4px; }
-        .log-stack::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
-        .log-card { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 14px; border-radius: 12px; text-align: left; cursor: pointer; border-left: 4px solid transparent; transition: all 0.22s ease; }
-        .log-card.latest { border-left-color: #38bdf8; background: rgba(56, 189, 248, 0.12); box-shadow: 0 0 15px rgba(56, 189, 248, 0.15); }
-        .detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .detail-label { color: #64748b; font-size: 11px; text-transform: uppercase; font-weight: 800; }
-        .detail-val { color: white; font-size: 13px; font-weight: 600; }
-        .snapshot-grid { display: grid; grid-template-columns: 100px 1fr; gap: 8px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-top: 10px; }
+        .status-pill { display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: rgba(34, 197, 94, 0.95); font-size: 11px; font-weight: 850; min-width: 82px; }
+        .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: rgba(180, 210, 255, 0.34); cursor: pointer; transition: all 0.2s ease; }
+        .icon-action:hover { background: rgba(126, 184, 255, 0.08); border-color: rgba(126, 184, 255, 0.14); color: rgba(220, 235, 255, 0.88); transform: translateY(-1px); }
+        .icon-action.danger { color: rgba(248, 113, 113, 0.82); }
+        .icon-action.danger:hover { background: rgba(239, 68, 68, 0.1); border-color: rgba(248, 113, 113, 0.2); color: rgba(252, 165, 165, 0.98); }
+        .stamp-cell { text-align: center; }
+        .history-btn {
+          min-width: 58px;
+          min-height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8px;
+          border: 1px solid rgba(56, 189, 248, 0.18);
+          background: rgba(56, 189, 248, 0.08);
+          color: rgba(125, 211, 252, 0.92);
+          font-family: inherit;
+          font-size: 12px;
+          font-weight: 750;
+          line-height: 1;
+          letter-spacing: 0;
+          text-transform: none;
+          cursor: pointer;
+          transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+        }
+        .history-btn:hover {
+          transform: translateY(-1px);
+          border-color: rgba(56, 189, 248, 0.32);
+          background: rgba(56, 189, 248, 0.12);
+          color: rgba(224, 242, 254, 0.98);
+        }
+        @keyframes logOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes logModalIn { from { opacity: 0; transform: translateY(18px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes logItemIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .log-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(1, 6, 18, 0.78);
+          backdrop-filter: blur(10px) saturate(135%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          padding: 18px;
+          animation: logOverlayIn 0.2s ease forwards;
+        }
+        .log-modal {
+          width: min(460px, 100%);
+          max-height: min(680px, calc(100vh - 36px));
+          min-height: 560px;
+          background: linear-gradient(180deg, rgba(126, 184, 255, 0.045), transparent 44%), rgba(8, 18, 40, 0.96);
+          border: 1px solid rgba(126, 184, 255, 0.16);
+          border-radius: 20px;
+          box-shadow: 0 28px 70px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255,255,255,0.06);
+          padding: 22px;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          overflow: hidden;
+          animation: logModalIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .log-close-btn {
+          position: absolute;
+          top: 18px;
+          right: 18px;
+          z-index: 10;
+          width: 32px;
+          height: 32px;
+          border-radius: 10px;
+          border: 1px solid transparent;
+          background: transparent;
+          color: rgba(180, 210, 255, 0.42);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+        }
+        .log-close-btn:hover {
+          transform: translateY(-1px);
+          background: rgba(248, 113, 113, 0.1);
+          border-color: rgba(248, 113, 113, 0.18);
+          color: rgba(252, 165, 165, 0.96);
+        }
+        .log-title { color: rgba(245, 250, 255, 0.96); font-size: 17px; line-height: 1; margin: 0; font-weight: 850; }
+        .log-subtitle { color: rgba(180, 210, 255, 0.42); font-size: 12px; margin: 7px 0 16px; }
+        .filter-bar {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 8px;
+          margin-bottom: 14px;
+          padding: 4px;
+          border: 1px solid rgba(126, 184, 255, 0.1);
+          border-radius: 12px;
+          background: rgba(126, 184, 255, 0.035);
+        }
+        .filter-btn {
+          min-height: 30px;
+          border: 1px solid transparent;
+          color: rgba(180, 210, 255, 0.48);
+          font-family: inherit;
+          font-size: 10.5px;
+          font-weight: 850;
+          cursor: pointer;
+          padding: 0 8px;
+          border-radius: 9px;
+          background: transparent;
+          transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+        }
+        .filter-btn:hover {
+          transform: translateY(-1px);
+          color: rgba(220, 235, 255, 0.88);
+          background: rgba(126, 184, 255, 0.07);
+        }
+        .filter-btn.active {
+          color: rgba(224, 242, 254, 0.98);
+          background: rgba(56, 189, 248, 0.13);
+          border-color: rgba(56, 189, 248, 0.2);
+          box-shadow: 0 8px 18px rgba(56, 189, 248, 0.08);
+        }
+        .log-stack { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 4px 2px 0; display: flex; flex-direction: column; gap: 11px; }
+        .log-stack::-webkit-scrollbar { width: 7px; }
+        .log-stack::-webkit-scrollbar-track { background: rgba(8, 18, 40, 0.35); border-radius: 999px; }
+        .log-stack::-webkit-scrollbar-thumb { background: rgba(126, 184, 255, 0.25); border-radius: 999px; }
+        .log-card {
+          width: 100%;
+          background: rgba(126, 184, 255, 0.045);
+          border: 1px solid rgba(126, 184, 255, 0.08);
+          padding: 14px;
+          border-radius: 14px;
+          text-align: left;
+          cursor: pointer;
+          border-left: 4px solid transparent;
+          transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+          animation: logItemIn 0.26s ease both;
+        }
+        .log-card:hover {
+          transform: translateX(3px);
+          border-color: rgba(126, 184, 255, 0.2);
+          background: rgba(126, 184, 255, 0.075);
+          box-shadow: inset 3px 0 0 rgba(56, 189, 248, 0.62), 0 12px 24px rgba(0,0,0,0.16);
+        }
+        .log-card.latest {
+          border-left-color: #38bdf8;
+          background: rgba(56, 189, 248, 0.12);
+          border-color: rgba(56, 189, 248, 0.18);
+          box-shadow: 0 0 18px rgba(56, 189, 248, 0.12);
+        }
+        .log-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .log-action-pill {
+          display: inline-flex;
+          align-items: center;
+          min-height: 24px;
+          padding: 0 9px;
+          border-radius: 999px;
+          background: rgba(56, 189, 248, 0.1);
+          border: 1px solid rgba(56, 189, 248, 0.16);
+          color: rgba(125, 211, 252, 0.95);
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+        }
+        .log-date-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+        .log-date { font-size: 11px; color: rgba(191, 219, 254, 0.9); font-weight: 850; }
+        .log-time { font-size: 10.5px; color: rgba(180, 210, 255, 0.36); font-weight: 750; }
+        .log-description { color: rgba(245, 250, 255, 0.94); font-size: 13px; margin-top: 10px; font-weight: 750; }
+        .log-actor { color: rgba(180, 210, 255, 0.46); font-size: 11.5px; margin-top: 4px; }
+        .log-empty {
+          flex: 1;
+          min-height: 260px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          color: rgba(180, 210, 255, 0.36);
+          font-size: 12.5px;
+          border: 1px dashed rgba(126, 184, 255, 0.12);
+          border-radius: 14px;
+          background: rgba(126, 184, 255, 0.025);
+        }
+        .detail-back-btn {
+          width: fit-content;
+          min-height: 34px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 0 10px;
+          border-radius: 10px;
+          border: 1px solid rgba(56, 189, 248, 0.12);
+          background: rgba(56, 189, 248, 0.06);
+          color: rgba(125, 211, 252, 0.95);
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+          margin-bottom: 18px;
+          transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+        }
+        .detail-back-btn:hover {
+          transform: translateY(-1px);
+          background: rgba(56, 189, 248, 0.1);
+          border-color: rgba(56, 189, 248, 0.22);
+        }
+        .detail-row { display: grid; grid-template-columns: 124px 1fr; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(126, 184, 255, 0.08); }
+        .detail-label { color: rgba(180, 210, 255, 0.34); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 850; }
+        .detail-val { color: rgba(245, 250, 255, 0.94); font-size: 12.5px; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+        .detail-val.accent { color: rgba(125, 211, 252, 0.98); }
+        .detail-val.warning { color: rgba(250, 204, 21, 0.92); }
+        .snapshot-panel { margin-top: 18px; border-top: 1px solid rgba(126, 184, 255, 0.1); padding-top: 14px; overflow-y: auto; }
+        .snapshot-title { color: rgba(125, 211, 252, 0.96); font-size: 10.5px; font-weight: 900; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+        .snapshot-grid { display: grid; grid-template-columns: 112px 1fr; gap: 8px; background: rgba(126, 184, 255, 0.045); border: 1px solid rgba(126, 184, 255, 0.09); padding: 12px; border-radius: 12px; }
+        .snapshot-key { color: rgba(180, 210, 255, 0.34); font-size: 10px; font-weight: 850; }
+        .snapshot-value { color: rgba(220, 235, 255, 0.76); font-size: 11.5px; text-align: right; word-break: break-word; }
+        @media (max-width: 1180px) {
+          .customer-toolbar { width: 100%; flex-wrap: wrap; justify-content: stretch; }
+          .customer-search { max-width: none; }
+          .customer-toolbar .filter-dropdown { flex: 1 1 148px; }
+        }
       `}</style>
 
       <div className="customer-list-page">
         <header className="page-header">
           <div>
-            <h1 style={{color:'white', margin: 0, fontSize: '20px', fontWeight: 800}}>Customer Directory</h1>
-            <p style={{color:'#475569', fontSize:'11px'}}>{filteredCustomers.length} total entries</p>
+            <h1 className="customer-title">Customer Directory</h1>
+            <p className="customer-subtitle">{filteredCustomers.length} total entries</p>
           </div>
-          <div style={{display:'flex', gap:'10px'}}>
-             <div style={{background: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px', padding: '0 10px', display: 'flex', alignItems: 'center'}}>
-                <Search size={14} color="#475569" />
-                <input placeholder="Search..." value={searchQuery} onChange={event => setSearchQuery(event.target.value)} style={{background:'none', border:'none', color:'white', padding:'8px', outline:'none', fontSize:'12px'}} />
+          <div className="customer-toolbar">
+             <div className="customer-search">
+                <Search size={14} color="rgba(180, 210, 255, 0.28)" />
+                <input placeholder="Search ID, name, pay, address..." value={searchQuery} onChange={event => setSearchQuery(event.target.value)} />
              </div>
+             <FilterDropdown
+               label="Pay Term"
+               value={paytermFilter}
+               onChange={setPaytermFilter}
+               options={[
+                 { value: 'ALL', label: 'All Pay Terms' },
+                 ...paytermOptions.map((payterm) => ({ value: payterm, label: payterm })),
+               ]}
+             />
+             <FilterDropdown
+               label="Status"
+               value={statusFilter}
+               onChange={setStatusFilter}
+               options={[
+                 { value: 'ALL', label: 'All Status' },
+                 ...statusOptions.map((status) => ({ value: status, label: status })),
+               ]}
+             />
              {canRecoverDeletedRecords && (
-               <button onClick={() => navigate('/deleted-customers')} style={{background: 'transparent', border: '1px solid #16a34a', color: '#4ade80', padding: '8px 14px', borderRadius: '8px', cursor:'pointer', fontSize:'11px', fontWeight: '800'}}>RECOVER DELETED</button>
+               <button className="customer-btn recover" onClick={() => navigate('/deleted-customers')}>RECOVER DELETED</button>
              )}
              {canAddCustomer && (
-                <button onClick={() => setIsAddModalOpen(true)} style={{background: '#2563eb', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: '800', cursor: 'pointer', fontSize: '11px'}}>+ ADD CUSTOMER</button>
+                <button className="customer-btn add" onClick={() => setIsAddModalOpen(true)}>+ ADD CUSTOMER</button>
              )}
           </div>
         </header>
+
+        {pageError && <div className="customer-error">{pageError}</div>}
 
         <div className="table-frame">
           <div className="scroll-container">
             <table className="c-table">
               <thead>
                 <tr>
-                  <th className="col-id">ID</th>
-                  <th className="col-name">Name</th>
-                  <th className="col-pay">Pay</th>
-                  <th>Address</th>
-                  <th className="col-status">Status</th>
+                  <th className="col-id"><button type="button" className="customer-sort-btn" onClick={() => handleSort('custno')}>{sortLabel('custno', 'ID')}</button></th>
+                  <th className="col-name"><button type="button" className="customer-sort-btn" onClick={() => handleSort('custname')}>{sortLabel('custname', 'Name')}</button></th>
+                  <th className="col-pay"><button type="button" className="customer-sort-btn" onClick={() => handleSort('payterm')}>{sortLabel('payterm', 'Pay')}</button></th>
+                  <th><button type="button" className="customer-sort-btn" onClick={() => handleSort('address')}>{sortLabel('address', 'Address')}</button></th>
+                  <th className="col-status"><button type="button" className="customer-sort-btn" onClick={() => handleSort('record_status')}>{sortLabel('record_status', 'Status')}</button></th>
                   {canSeeAuditHistory && <th className="col-hist" style={{textAlign:'center'}}>Stamp</th>}
                   <th className="col-actions" style={{textAlign:'center'}}>Actions</th>
                 </tr>
@@ -262,32 +635,37 @@ function CustomerListPage() {
                 {isLoading ? (
                   <tr><td colSpan={7} style={{textAlign:'center', padding:'40px'}}><Loader2 className="animate-spin mx-auto" color="#38bdf8"/></td></tr>
                 ) : filteredCustomers.map((customer) => (
-                  <tr key={customer.custno} onClick={() => setSelectedRowId(customer.custno)} style={{background: selectedRowId === customer.custno ? 'rgba(56, 189, 248, 0.08)' : 'transparent'}}>
-                    <td style={{fontFamily:'monospace', color: '#475569'}}>{customer.custno}</td>
+                  <tr
+                    key={customer.custno}
+                    onClick={() => {
+                      setSelectedRowId(customer.custno)
+                      navigate(`/customers/${customer.custno}`)
+                    }}
+                    title="Open customer details"
+                    style={{background: selectedRowId === customer.custno ? 'rgba(56, 189, 248, 0.08)' : 'transparent'}}
+                  >
+                    <td className="id-cell" style={{fontFamily:'monospace', color: '#475569', textAlign: 'center'}}>{customer.custno}</td>
                     <td style={{color: 'white', fontWeight: '800'}}>{customer.custname}</td>
                     <td style={{textAlign:'center', fontWeight:'900', color: '#64748b'}}>{customer.payterm}</td>
                     <td>{customer.address}</td>
-                    <td><div style={{color:'#22c55e', fontSize:'11px', fontWeight:'850', display:'flex', alignItems:'center', gap:'5px'}}><UserCheck size={14}/> {customer.record_status}</div></td>
+                    <td className="col-status-cell"><div className="status-pill"><UserCheck size={14}/> {customer.record_status}</div></td>
                     
                     {canSeeAuditHistory && (
-                      <td className="col-hist" onClick={(event) => event.stopPropagation()}>
-                        <button className="history-btn" onClick={(event) => handleHistoryClick(event, customer.stamp)}>View</button>
+                      <td className="col-hist stamp-cell" onClick={(event) => event.stopPropagation()}>
+                        <button className="history-btn" onClick={(event) => handleHistoryClick(event, customer.stamp, 'ALL', customer.custno)}>View</button>
                       </td>
                     )}
 
                     <td className="col-actions" onClick={(event) => event.stopPropagation()}>
                         <div className="action-container">
-                          {/* View Button - Visible to all roles */}
-                          <button onClick={() => navigate(`/customers/${customer.custno}`)} style={{background:'none', border:'none', color:'#475569', cursor:'pointer'}}><Eye size={15}/></button>
-                          
                           {/* Edit Button - SuperAdmin/Admin */}
                           {canEditCustomer && (
-                            <button onClick={() => setEditingCustomer(customer)} style={{background:'none', border:'none', color:'#475569', cursor:'pointer'}}><Edit size={15}/></button>
+                            <button className="icon-action" onClick={() => setEditingCustomer(customer)} title="Edit customer"><Edit size={15}/></button>
                           )}
 
                           {/* Delete Button - STRICTLY SuperAdmin Only */}
                           {canDeleteCustomer && (
-                            <button onClick={() => {}} style={{background:'none', border:'none', color:'#ef4444', cursor:'pointer'}}><Trash2 size={15}/></button>
+                            <button className="icon-action danger" onClick={() => setDeletingCustomer(customer)} title="Deactivate customer"><Trash2 size={15}/></button>
                           )}
                         </div>
                     </td>
@@ -302,50 +680,60 @@ function CustomerListPage() {
       {logModal.isOpen && (
         <div className="log-overlay" onClick={() => setLogModal({ ...logModal, isOpen: false })}>
           <div className="log-modal" onClick={event => event.stopPropagation()}>
-            <X size={20} color="#64748b" style={{position:'absolute', top:'24px', right:'24px', cursor:'pointer', zIndex: 10}} onClick={() => setLogModal({ ...logModal, isOpen: false })} />
+            <button
+              type="button"
+              className="log-close-btn"
+              onClick={() => setLogModal({ ...logModal, isOpen: false })}
+              aria-label="Close audit stack"
+            >
+              <X size={17} />
+            </button>
 
             {logModal.view === 'list' ? (
               <>
-                <h3 style={{color:'white', fontSize:'16px', margin:'0 0 10px 0', fontWeight: 850}}>Audit Stack</h3>
+                <h3 className="log-title">Audit Stack</h3>
+                <p className="log-subtitle">Review recent customer changes and previous row snapshots.</p>
                 <div className="filter-bar">
                   {['ALL', 'WEEK', 'MONTH', 'YEAR'].map(option => (
-                    <button key={option} className={`filter-btn ${timeFilter === option ? 'active' : ''}`} onClick={() => handleHistoryClick(null, logModal.rawStampData, option)}>{option}</button>
+                    <button key={option} className={`filter-btn ${timeFilter === option ? 'active' : ''}`} onClick={() => handleHistoryClick(null, logModal.rawStampData, option, logModal.customerId)}>{option}</button>
                   ))}
                 </div>
                 <div className="log-stack">
                   {logModal.history.length > 0 ? logModal.history.map((item, index) => (
                     <div key={index} className={`log-card ${index === 0 ? 'latest' : ''}`} onClick={() => setLogModal({...logModal, view: 'detail', selectedEntry: item})}>
-                      <div style={{display:'flex', justifyContent:'space-between', alignItems: 'flex-start'}}>
-                        <span style={{fontSize:'10px', color:'#38bdf8', fontWeight:900}}>{item.actionType.toUpperCase()}</span>
-                        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end'}}>
-                          <span style={{fontSize:'11px', color:'#38bdf8', fontWeight:900}}>{item.displayDate}</span>
-                          <span style={{fontSize: '10px', color: '#475569', fontWeight: 700, marginTop: '2px'}}>{item.militaryTime}</span>
+                      <div className="log-card-top">
+                        <span className="log-action-pill">{item.actionType.toUpperCase()}</span>
+                        <div className="log-date-stack">
+                          <span className="log-date">{item.displayDate}</span>
+                          <span className="log-time">{item.militaryTime}</span>
                         </div>
                       </div>
-                      <div style={{color:'white', fontSize:'13px', marginTop:'6px', fontWeight: 700}}>{item.modificationDescription}</div>
-                      <div style={{color:'#64748b', fontSize:'11px'}}>by {item.userName}</div>
+                      <div className="log-description">{item.modificationDescription}</div>
+                      <div className="log-actor">by {item.userName}</div>
                     </div>
-                  )) : <p style={{color: '#475569', fontSize: '12px', textAlign: 'center', marginTop: '40px'}}>No entries found</p>}
+                  )) : <div className="log-empty">No audit entries found for this filter.</div>}
                 </div>
               </>
             ) : (
               <>
-                <button onClick={() => setLogModal({...logModal, view: 'list', selectedEntry: null})} style={{background:'none', border:'none', color:'#38bdf8', fontSize:'12px', display:'flex', alignItems:'center', gap:'4px', cursor:'pointer', marginBottom:'25px', padding:0, fontWeight: 800}}>
+                <button onClick={() => setLogModal({...logModal, view: 'list', selectedEntry: null})} className="detail-back-btn">
                   <ChevronLeft size={18}/> Back to History
                 </button>
-                <div className="detail-row"><span className="detail-label">Modification</span><span className="detail-val" style={{color:'#38bdf8'}}>{logModal.selectedEntry.modificationDescription}</span></div>
+                <h3 className="log-title">Audit Details</h3>
+                <p className="log-subtitle">Focused record of the selected customer activity.</p>
+                <div className="detail-row"><span className="detail-label">Modification</span><span className="detail-val accent">{logModal.selectedEntry.modificationDescription}</span></div>
                 <div className="detail-row"><span className="detail-label">Actual Name</span><span className="detail-val">{logModal.selectedEntry.userName}</span></div>
                 <div className="detail-row"><span className="detail-label">Actual Email</span><span className="detail-val">{logModal.selectedEntry.userEmail}</span></div>
-                <div className="detail-row"><span className="detail-label">System Role</span><span className="detail-val" style={{color:'#facc15'}}>{logModal.selectedEntry.systemRole}</span></div>
+                <div className="detail-row"><span className="detail-label">System Role</span><span className="detail-val warning">{logModal.selectedEntry.systemRole}</span></div>
                 <div className="detail-row"><span className="detail-label">Timestamp</span><span className="detail-val">{logModal.selectedEntry.displayDate} | {logModal.selectedEntry.militaryTime}</span></div>
                 {logModal.selectedEntry.previousRowSnapshot && (
-                  <div style={{ marginTop: '20px', borderTop: '1px solid #1e293b', paddingTop: '15px', overflowY: 'auto' }}>
-                    <p style={{ color: '#38bdf8', fontSize: '10px', fontWeight: 900, marginBottom: '12px', textTransform: 'uppercase' }}>View Past Row</p>
+                  <div className="snapshot-panel">
+                    <p className="snapshot-title">View Past Row</p>
                     <div className="snapshot-grid">
                       {Object.entries(logModal.selectedEntry.previousRowSnapshot).map(([key, value]) => (
                         <React.Fragment key={key}>
-                          <div style={{ color: '#475569', fontSize: '10px', fontWeight: 800 }}>{key.toUpperCase()}</div>
-                          <div style={{ color: '#94a3b8', fontSize: '11px', textAlign: 'right', wordBreak: 'break-all' }}>{String(value ?? '-')}</div>
+                          <div className="snapshot-key">{key.toUpperCase()}</div>
+                          <div className="snapshot-value">{String(value ?? '-')}</div>
                         </React.Fragment>
                       ))}
                     </div>
@@ -359,6 +747,12 @@ function CustomerListPage() {
 
       <EditCustomerModal isOpen={Boolean(editingCustomer)} customer={editingCustomer} onClose={() => setEditingCustomer(null)} onSubmit={handleUpdateCustomer} />
       <AddCustomerModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSubmit={handleAddCustomer} />
+      <SoftDeleteConfirmDialog
+        isOpen={Boolean(deletingCustomer)}
+        customer={deletingCustomer}
+        onClose={() => setDeletingCustomer(null)}
+        onConfirm={handleSoftDeleteCustomer}
+      />
     </>
   )
 }

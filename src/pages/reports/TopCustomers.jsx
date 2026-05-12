@@ -6,10 +6,12 @@ import {
   getReportValue,
   getTopCustomers,
 } from '../../services/reportsApi'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import './Reports.css'
 
 function TopCustomers() {
   const [rows, setRows] = useState([])
+  const [rankFilter, setRankFilter] = useState('10')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -31,97 +33,116 @@ function TopCustomers() {
   }, [])
 
   const stats = useMemo(() => {
-    const totalSpend = rows.reduce(
+    const rankedRows = rows.slice(0, Number(rankFilter))
+    const totalSpend = rankedRows.reduce(
       (sum, row) => sum + Number(getReportValue(row, 'total_spent', 'total_spent') || 0),
       0
     )
-    const totalTransactions = rows.reduce(
+    const totalTransactions = rankedRows.reduce(
       (sum, row) => sum + Number(getReportValue(row, 'total_transactions', 'total_transactions') || 0),
       0
     )
     const topSpend = Math.max(
-      ...rows.map((row) => Number(getReportValue(row, 'total_spent', 'total_spent') || 0)),
+      ...rankedRows.map((row) => Number(getReportValue(row, 'total_spent', 'total_spent') || 0)),
       0
     )
 
     return { totalSpend, totalTransactions, topSpend }
-  }, [rows])
+  }, [rankFilter, rows])
+
+  const visibleRows = useMemo(() => {
+    return rows.slice(0, Number(rankFilter))
+  }, [rankFilter, rows])
 
   return (
     <div className="reports-page">
       <div className="reports-header">
         <div className="reports-title-wrap">
-          <div className="reports-title-icon"><Trophy size={20} color="#ffffff" /></div>
+          <div className="reports-title-icon top-customers-icon"><Trophy size={20} /></div>
           <div>
-            <h1 className="reports-title" style={{ color: '#ffffff' }}>Top Customers</h1>
-            <p className="reports-subtitle" style={{ color: 'rgba(255,255,255,0.7)' }}>
+            <h1 className="reports-title">Top Customers</h1>
+            <p className="reports-subtitle">
               Ranked top 10 customers by total spend, linked to customer detail.
             </p>
           </div>
+        </div>
+        <div className="reports-filters">
+          <FilterDropdown
+            label="Rank"
+            value={rankFilter}
+            onChange={setRankFilter}
+            options={[
+              { value: '10', label: 'Top 10' },
+              { value: '5', label: 'Top 5' },
+              { value: '3', label: 'Top 3' },
+            ]}
+          />
         </div>
       </div>
 
       <section className="reports-stat-grid" aria-label="Top customer totals">
         <div className="reports-stat-card">
-          <div className="reports-stat-icon"><Users size={17} color="#ffffff" /></div>
+          <div className="reports-stat-icon"><Users size={17} /></div>
           <div>
-            <span className="reports-stat-label" style={{ color: 'rgba(255,255,255,0.6)' }}>Ranked Customers</span>
-            <span className="reports-stat-value">{rows.length}</span>
+            <span className="reports-stat-label">Ranked Customers</span>
+            <span className="reports-stat-value">{visibleRows.length}</span>
           </div>
         </div>
         <div className="reports-stat-card">
-          <div className="reports-stat-icon"><ShoppingCart size={17} color="#ffffff" /></div>
+          <div className="reports-stat-icon"><ShoppingCart size={17} /></div>
           <div>
-            <span className="reports-stat-label" style={{ color: 'rgba(255,255,255,0.6)' }}>Transactions</span>
+            <span className="reports-stat-label">Transactions</span>
             <span className="reports-stat-value">{stats.totalTransactions}</span>
           </div>
         </div>
         <div className="reports-stat-card">
-          <div className="reports-stat-icon"><Wallet size={17} color="#ffffff" /></div>
+          <div className="reports-stat-icon"><Wallet size={17} /></div>
           <div>
-            <span className="reports-stat-label" style={{ color: 'rgba(255,255,255,0.6)' }}>Top 10 Spend</span>
+            <span className="reports-stat-label">Selected Spend</span>
             <span className="reports-stat-value">{formatCurrency(stats.totalSpend)}</span>
           </div>
         </div>
       </section>
 
-      {error && <div className="reports-feedback" style={{ color: '#ff6b6b' }}>{error}</div>}
+      {error && <div className="reports-feedback">{error}</div>}
 
       <section className="leaderboard-card">
         {loading ? (
           <div className="reports-empty">
             <Loader2 className="animate-spin mb-3 mx-auto text-blue-400" size={28} />
-            <p style={{ color: '#ffffff' }}>Loading top customers...</p>
+            <p>Loading top customers...</p>
           </div>
         ) : rows.length === 0 ? (
-          <div className="reports-empty" style={{ color: '#ffffff' }}>No ranked customers found.</div>
+          <div className="reports-empty">No ranked customers found.</div>
         ) : (
           <div className="leaderboard-list">
-            {rows.map((row, index) => {
+            {visibleRows.map((row, index) => {
               const totalSpend = Number(getReportValue(row, 'total_spent', 'total_spent') || 0)
               const totalTransactions = Number(getReportValue(row, 'total_transactions', 'total_transactions') || 0)
               const width = stats.topSpend > 0 ? Math.max((totalSpend / stats.topSpend) * 100, 3) : 0
 
+              const rankClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : ''
+
               return (
-                <div className="leaderboard-row" key={row.custno || row.custname}>
-                  <div className="leaderboard-rank" style={{ color: '#ffffff' }}>
-                    {index < 3 ? <Medal size={15} color="#ffffff" /> : index + 1}
+                <div className={`leaderboard-row ${rankClass}`} key={row.custno || row.custname}>
+                  <div className={`leaderboard-rank ${rankClass}`}>
+                    {index < 3 ? <Medal size={15} /> : index + 1}
                   </div>
-                  <div className="leaderboard-name" style={{ color: '#ffffff' }}>
+                  <div className="leaderboard-name">
                     {row.custno ? (
-                      <Link to={`/customers/${row.custno}`} style={{ color: '#ffffff', fontWeight: 'bold' }}>
+                      <Link to={`/customers/${row.custno}`}>
                         {row.custname || row.custno}
                       </Link>
                     ) : (
-                      <strong style={{ color: '#ffffff' }}>{row.custname || 'Unknown customer'}</strong>
+                      <strong>{row.custname || 'Unknown customer'}</strong>
                     )}
-                    <span style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    <span>
                       {row.custno ? `${row.custno} - ` : ''}{totalTransactions.toLocaleString()} transactions
                     </span>
                   </div>
                   <div className="leaderboard-meter-wrap">
-                    <div className="leaderboard-meter" aria-hidden="true" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                      <div className="leaderboard-meter-fill" style={{ width: `${width}%`, background: '#3b82f6' }} />
+                    <div className="leaderboard-meter" aria-hidden="true">
+                      <div className="leaderboard-meter-fill" style={{ width: `${width}%` }} />
                     </div>
                     <div className="leaderboard-value">{formatCurrency(totalSpend)}</div>
                   </div>

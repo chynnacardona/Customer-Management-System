@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react'
-import { ClipboardList, Loader2, Radio } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CalendarDays, ChevronDown, ChevronUp, ClipboardList, Loader2, Radio, Search } from 'lucide-react'
+import FilterDropdown from '../../components/shared/FilterDropdown'
+import DatePickerField from '../../components/shared/DatePickerField'
 import { getAuditLogs, subscribeToAuditLogs } from '../../services/auditLogService'
 
 function AuditLogs() {
   const [auditRows, setAuditRows] = useState([])
+  const [search, setSearch] = useState('')
+  const [dateRangeMode, setDateRangeMode] = useState('ALL')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -42,6 +49,60 @@ function AuditLogs() {
       dateStyle: 'medium',
       timeStyle: 'medium',
     }).format(new Date(value))
+  }
+
+  const filteredAuditRows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    const filtered = auditRows.filter((row) => {
+      const dateValue = row.created_at ? String(row.created_at).slice(0, 10) : ''
+      const metadata = JSON.stringify(row.metadata || {})
+      const searchable = [
+        row.created_at,
+        formatTimestamp(row.created_at),
+        row.actor_email,
+        row.actor_user_id,
+        row.actor_role,
+        row.action,
+        row.entity_type,
+        row.entity_id,
+        metadata,
+      ]
+
+      const matchesSearch = !term || searchable.some((value) => String(value || '').toLowerCase().includes(term))
+      const matchesFrom = !dateFrom || dateValue >= dateFrom
+      const matchesTo = !dateTo || dateValue <= dateTo
+
+      return matchesSearch && matchesFrom && matchesTo
+    })
+
+    const direction = sortConfig.direction === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      const aValue = sortConfig.key === 'entity'
+        ? `${a.entity_type || ''} ${a.entity_id || ''}`
+        : a[sortConfig.key]
+      const bValue = sortConfig.key === 'entity'
+        ? `${b.entity_type || ''} ${b.entity_id || ''}`
+        : b[sortConfig.key]
+      return String(aValue || '').localeCompare(String(bValue || '')) * direction
+    })
+  }, [auditRows, dateFrom, dateTo, search, sortConfig])
+
+  const handleSort = (key) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const sortLabel = (key, label) => {
+    const active = sortConfig.key === key
+    const SortIcon = sortConfig.direction === 'asc' ? ChevronUp : ChevronDown
+    return (
+      <>
+        <span>{label}</span>
+        {active && <SortIcon className="sort-side-icon" size={13} />}
+      </>
+    )
   }
 
   return (
@@ -86,6 +147,64 @@ function AuditLogs() {
 
         .audit-live-badge svg {
           animation: auditPulse 1.4s ease-in-out infinite;
+        }
+
+        .audit-toolbar {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+
+        .audit-search {
+          min-width: 300px;
+          min-height: 36px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border-radius: 10px;
+          border: 1px solid rgba(126, 184, 255, 0.14);
+          background: rgba(126, 184, 255, 0.045);
+          padding: 0 11px;
+        }
+
+        .audit-search input {
+          width: 100%;
+          border: 0;
+          outline: 0;
+          background: transparent;
+          color: rgba(225, 238, 255, 0.9);
+          font-size: 12.5px;
+        }
+
+        .audit-search svg {
+          color: rgba(180, 210, 255, 0.34);
+          flex-shrink: 0;
+        }
+
+        .audit-sort-btn {
+          border: 0;
+          padding: 0;
+          background: transparent;
+          color: inherit;
+          font: inherit;
+          text-transform: inherit;
+          letter-spacing: inherit;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+        }
+
+        .audit-sort-btn:hover {
+          color: rgba(224, 242, 254, 0.96);
+        }
+
+        .sort-side-icon {
+          color: rgba(56, 189, 248, 0.95);
+          flex-shrink: 0;
+          stroke-width: 2.8;
         }
 
         @keyframes auditPulse {
@@ -237,7 +356,39 @@ function AuditLogs() {
               <p className="audit-logs-subtitle">Realtime USER, ADMIN, and SUPERADMIN activity stream.</p>
             </div>
           </div>
-          <div className="audit-live-badge"><Radio size={13} />Live</div>
+          <div className="audit-toolbar">
+            <div className="audit-search">
+              <Search size={14} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search actor, role, action, entity..."
+              />
+            </div>
+            <CalendarDays size={15} color="rgba(180, 210, 255, 0.5)" />
+            <FilterDropdown
+              label="Date"
+              value={dateRangeMode}
+              onChange={(value) => {
+                setDateRangeMode(value)
+                if (value === 'ALL') {
+                  setDateFrom('')
+                  setDateTo('')
+                }
+              }}
+              options={[
+                { value: 'ALL', label: 'All Dates' },
+                { value: 'CUSTOM', label: 'Custom Date' },
+              ]}
+            />
+            {dateRangeMode === 'CUSTOM' && (
+              <>
+                <DatePickerField value={dateFrom} onChange={setDateFrom} label="Audit date from" />
+                <DatePickerField value={dateTo} onChange={setDateTo} label="Audit date to" />
+              </>
+            )}
+            <div className="audit-live-badge"><Radio size={13} />Live</div>
+          </div>
         </div>
 
         <section className="audit-logs-table-card">
@@ -248,23 +399,23 @@ function AuditLogs() {
             </div>
           ) : error ? (
             <div className="audit-feedback error">{error}</div>
-          ) : auditRows.length === 0 ? (
+          ) : filteredAuditRows.length === 0 ? (
             <div className="audit-feedback">No USER, ADMIN, or SUPERADMIN activity logged yet.</div>
           ) : (
             <div className="audit-logs-table-scroll">
               <table className="audit-logs-table">
                 <thead>
                   <tr>
-                    <th>Timestamp</th>
-                    <th>Actor</th>
-                    <th>Role</th>
-                    <th>Action</th>
-                    <th>Entity</th>
+                    <th><button type="button" className="audit-sort-btn" onClick={() => handleSort('created_at')}>{sortLabel('created_at', 'Timestamp')}</button></th>
+                    <th><button type="button" className="audit-sort-btn" onClick={() => handleSort('actor_email')}>{sortLabel('actor_email', 'Actor')}</button></th>
+                    <th><button type="button" className="audit-sort-btn" onClick={() => handleSort('actor_role')}>{sortLabel('actor_role', 'Role')}</button></th>
+                    <th><button type="button" className="audit-sort-btn" onClick={() => handleSort('action')}>{sortLabel('action', 'Action')}</button></th>
+                    <th><button type="button" className="audit-sort-btn" onClick={() => handleSort('entity')}>{sortLabel('entity', 'Entity')}</button></th>
                     <th>Details</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {auditRows.map((row) => (
+                  {filteredAuditRows.map((row) => (
                     <tr key={row.id}>
                       <td>{formatTimestamp(row.created_at)}</td>
                       <td>{row.actor_email || row.actor_user_id}</td>
