@@ -3,6 +3,7 @@ import { CalendarDays, ChevronDown, ChevronUp, ClipboardList, Loader2, Radio, Se
 import FilterDropdown from '../../components/shared/FilterDropdown'
 import DatePickerField from '../../components/shared/DatePickerField'
 import { getAuditLogs, subscribeToAuditLogs } from '../../services/auditLogService'
+import { getLocalDateKey, getLocalDayIsoRange } from '../../utils/auditLogDates'
 
 function AuditLogs() {
   const [auditRows, setAuditRows] = useState([])
@@ -14,6 +15,9 @@ function AuditLogs() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  const effectiveDateFrom = dateRangeMode === 'CUSTOM' ? dateFrom || dateTo : ''
+  const effectiveDateTo = dateRangeMode === 'CUSTOM' ? dateTo || dateFrom : ''
+
   useEffect(() => {
     let mounted = true
     let unsubscribe = () => {}
@@ -22,11 +26,18 @@ function AuditLogs() {
       try {
         setLoading(true)
         setError('')
-        const rows = await getAuditLogs()
+        const { startIso } = getLocalDayIsoRange(effectiveDateFrom)
+        const { endIso } = getLocalDayIsoRange(effectiveDateTo)
+        const rows = await getAuditLogs({ limit: 500, startIso, endIso })
         if (!mounted) return
         setAuditRows(rows)
         unsubscribe = subscribeToAuditLogs((newLog) => {
-          setAuditRows((current) => [newLog, ...current].slice(0, 100))
+          const logDate = getLocalDateKey(newLog?.created_at)
+          const isWithinFrom = !effectiveDateFrom || logDate >= effectiveDateFrom
+          const isWithinTo = !effectiveDateTo || logDate <= effectiveDateTo
+          if (!isWithinFrom || !isWithinTo) return
+
+          setAuditRows((current) => [newLog, ...current].slice(0, 500))
         })
       } catch (err) {
         if (mounted) setError(err.message || 'Unable to load audit logs.')
@@ -41,7 +52,7 @@ function AuditLogs() {
       mounted = false
       unsubscribe()
     }
-  }, [])
+  }, [effectiveDateFrom, effectiveDateTo])
 
   const formatTimestamp = (value) => {
     if (!value) return '-'
@@ -54,7 +65,7 @@ function AuditLogs() {
   const filteredAuditRows = useMemo(() => {
     const term = search.trim().toLowerCase()
     const filtered = auditRows.filter((row) => {
-      const dateValue = row.created_at ? String(row.created_at).slice(0, 10) : ''
+      const dateValue = getLocalDateKey(row.created_at)
       const metadata = JSON.stringify(row.metadata || {})
       const searchable = [
         row.created_at,
@@ -69,8 +80,8 @@ function AuditLogs() {
       ]
 
       const matchesSearch = !term || searchable.some((value) => String(value || '').toLowerCase().includes(term))
-      const matchesFrom = !dateFrom || dateValue >= dateFrom
-      const matchesTo = !dateTo || dateValue <= dateTo
+      const matchesFrom = !effectiveDateFrom || dateValue >= effectiveDateFrom
+      const matchesTo = !effectiveDateTo || dateValue <= effectiveDateTo
 
       return matchesSearch && matchesFrom && matchesTo
     })
@@ -85,7 +96,7 @@ function AuditLogs() {
         : b[sortConfig.key]
       return String(aValue || '').localeCompare(String(bValue || '')) * direction
     })
-  }, [auditRows, dateFrom, dateTo, search, sortConfig])
+  }, [auditRows, effectiveDateFrom, effectiveDateTo, search, sortConfig])
 
   const handleSort = (key) => {
     setSortConfig((current) => ({
@@ -400,7 +411,11 @@ function AuditLogs() {
           ) : error ? (
             <div className="audit-feedback error">{error}</div>
           ) : filteredAuditRows.length === 0 ? (
-            <div className="audit-feedback">No USER, ADMIN, or SUPERADMIN activity logged yet.</div>
+            <div className="audit-feedback">
+              {dateRangeMode === 'CUSTOM'
+                ? 'No audit records found for the selected date.'
+                : 'No USER, ADMIN, or SUPERADMIN activity logged yet.'}
+            </div>
           ) : (
             <div className="audit-logs-table-scroll">
               <table className="audit-logs-table">
