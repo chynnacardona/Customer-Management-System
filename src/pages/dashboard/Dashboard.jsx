@@ -164,7 +164,7 @@ function Dashboard() {
           const [usersResult, deletedResult, auditResult] = await Promise.allSettled([
             supabase.from('user').select('userId, email, full_name, user_type, record_status').order('userId'),
             customerService.getDeletedCustomers(),
-            getAuditLogs(500),
+            getAuditLogs({ limit: 500 }),
           ])
 
           if (usersResult.status === 'fulfilled') setUserRows(usersResult.value.data || [])

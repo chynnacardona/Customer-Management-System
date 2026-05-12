@@ -6,6 +6,7 @@ import {
   getRoleAccess,
 } from '../src/utils/accessRules'
 import { buildHistoricalUserStats } from '../src/utils/dashboardUserHistory'
+import { getLocalDateKey, getLocalDayIsoRange } from '../src/utils/auditLogDates'
 
 describe('Sprint 1 test setup', () => {
   it('runs the Vitest suite without touching live customer data', () => {
@@ -120,5 +121,21 @@ describe('Dashboard historical active users', () => {
       activeAdmins: 1,
       activeUsersTotal: 3,
     })
+  })
+})
+
+describe('Audit log date filtering', () => {
+  it('keeps audit records tied to their real local calendar date', () => {
+    const localMay13Noon = new Date(2026, 4, 13, 12, 0, 0, 0)
+
+    expect(getLocalDateKey(localMay13Noon.toISOString())).toBe('2026-05-13')
+  })
+
+  it('builds a full-day query range for the selected calendar date', () => {
+    const range = getLocalDayIsoRange('2026-05-15')
+
+    expect(range.startIso).toContain('T')
+    expect(range.endIso).toContain('T')
+    expect(new Date(range.startIso).getTime()).toBeLessThan(new Date(range.endIso).getTime())
   })
 })

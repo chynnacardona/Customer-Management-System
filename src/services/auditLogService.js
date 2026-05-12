@@ -51,12 +51,17 @@ export async function logAuditActivity({ action, entityType, entityId = null, me
   if (error) return
 }
 
-export async function getAuditLogs(limit = 100) {
-  const { data, error } = await supabase
+export async function getAuditLogs({ limit = 100, startIso = null, endIso = null } = {}) {
+  let query = supabase
     .from('audit_logs')
     .select('id, actor_user_id, actor_email, actor_role, action, entity_type, entity_id, metadata, created_at')
     .order('created_at', { ascending: false })
     .limit(limit)
+
+  if (startIso) query = query.gte('created_at', startIso)
+  if (endIso) query = query.lte('created_at', endIso)
+
+  const { data, error } = await query
 
   if (error) {
     if (isMissingAuditTableError(error)) {
