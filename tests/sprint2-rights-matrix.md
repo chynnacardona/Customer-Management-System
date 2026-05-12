@@ -23,7 +23,7 @@ Branch: dev (post Sprint 2 merge)
 ## Additional UI Checks
 | Check | USER | ADMIN | SUPERADMIN |
 |---|---|---|---|
-| Deleted Customers sidebar link hidden | ✅/❌ | N/A | N/A |
+| Deleted Customers sidebar link hidden | ✅ | N/A | N/A |
 | Stamp column hidden | ✅ | N/A | N/A |
 | Stamp column visible | N/A | ✅ | ✅ |
 | Admin page blocked | ✅ | N/A | N/A |
