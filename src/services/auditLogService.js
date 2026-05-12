@@ -48,9 +48,7 @@ export async function logAuditActivity({ action, entityType, entityId = null, me
       metadata,
     })
 
-  if (error) {
-    console.warn('Audit log skipped:', error.message)
-  }
+  if (error) return
 }
 
 export async function getAuditLogs(limit = 100) {

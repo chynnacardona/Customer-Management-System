@@ -126,7 +126,9 @@ function DeletedCustomers() {
         .deleted-title-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fca5a5; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.16); }
         .deleted-title { font-size: 20px; font-weight: 800; color: white; margin: 0; }
         .deleted-subtitle { font-size: 12px; color: rgba(180, 210, 255, 0.35); margin: 6px 0 0; }
-        .deleted-search { display: flex; align-items: center; gap: 8px; min-width: 270px; background: rgba(126, 184, 255, 0.04); border: 1px solid rgba(126, 184, 255, 0.12); border-radius: 10px; padding: 8px 12px; }
+        .deleted-filters { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: nowrap; }
+        .deleted-filters .filter-dropdown { flex: 0 0 148px; }
+        .deleted-search { display: flex; align-items: center; gap: 8px; flex: 0 1 320px; min-width: 260px; background: rgba(126, 184, 255, 0.04); border: 1px solid rgba(126, 184, 255, 0.12); border-radius: 10px; padding: 8px 12px; }
         .deleted-search input { width: 100%; border: none; outline: none; background: transparent; color: rgba(220, 235, 255, 0.86); font-size: 12.5px; }
         .deleted-table-card { background: linear-gradient(145deg, rgba(8, 18, 40, 0.84), rgba(3, 9, 24, 0.9)); border: 1px solid rgba(126, 184, 255, 0.12); border-radius: 18px; overflow: hidden; flex: 1; display: flex; flex-direction: column; }
         .deleted-table-scroll { flex: 1; overflow: auto; }
@@ -167,6 +169,11 @@ function DeletedCustomers() {
 
         .deleted-summary-card { padding: 14px 16px; background: rgba(8, 18, 40, 0.5); border: 1px solid rgba(126, 184, 255, 0.12); border-radius: 18px; display: flex; justify-content: space-between; align-items: center; }
         .deleted-role-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; color: rgba(126, 184, 255, 0.9); background: rgba(46, 134, 245, 0.1); border: 1px solid rgba(100, 160, 255, 0.16); font-size: 11px; font-weight: 800; }
+        @media (max-width: 760px) {
+          .deleted-filters { width: 100%; flex-wrap: wrap; justify-content: stretch; }
+          .deleted-search { flex: 1 1 100%; min-width: 100%; }
+          .deleted-filters .filter-dropdown { flex: 1 1 148px; }
+        }
       `}</style>
 
       <div className="deleted-page">
@@ -203,6 +210,14 @@ function DeletedCustomers() {
           </section>
         ) : (
           <>
+            {error && (
+              <section className="deleted-access-card" style={{ color: 'rgba(252, 165, 165, 0.95)' }}>
+                <AlertTriangle size={20} />
+                <div style={{ marginLeft: '12px' }}>
+                  <span style={{ display: 'block', fontWeight: '800' }}>{error}</span>
+                </div>
+              </section>
+            )}
             <section className="deleted-summary-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Trash2 size={17} color="rgba(126, 184, 255, 0.76)" />

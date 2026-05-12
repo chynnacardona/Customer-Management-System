@@ -1,27 +1,27 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BarChart3, Loader2, Search, ShoppingCart, Users, UserX, Wallet } from 'lucide-react'
+import { BarChart3, ChevronDown, ChevronUp, Search, ShoppingCart, Users, UserX, Wallet } from 'lucide-react'
 import { formatCurrency, getCustomerSalesSummary } from '../../services/reportsApi'
+import FilterDropdown from '../../components/shared/FilterDropdown'
 import './Reports.css'
 
 // IMPORTANT: user_type should be passed from your auth context/state
 function CustomerSalesSummary({ user_type = 'USER' }) { 
   const [rows, setRows] = useState([])
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [paytermFilter, setPaytermFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [sortConfig, setSortConfig] = useState({ key: 'totalSpend', direction: 'desc' })
 
   const isAdmin = user_type === 'ADMIN' || user_type === 'SUPERADMIN'
 
   useEffect(() => {
     const loadSummary = async () => {
       try {
-        setLoading(true)
         const data = await getCustomerSalesSummary()
         setRows(data || [])
-      } catch (err) {
-        console.error('Report Error:', err)
-      } finally {
-        setLoading(false)
+      } catch {
+        setRows([])
       }
     }
     loadSummary()
@@ -33,12 +33,31 @@ function CustomerSalesSummary({ user_type = 'USER' }) {
       ? rows 
       : rows.filter(r => String(r.record_status || '').toUpperCase() === 'ACTIVE')
 
+    const filtered = roleBasedData.filter((row) => {
+      const status = String(row.record_status || '').toUpperCase()
+      const matchesPayterm = paytermFilter === 'ALL' || row.payterm === paytermFilter
+      const matchesStatus = statusFilter === 'ALL' || status === statusFilter
+      return matchesPayterm && matchesStatus
+    })
+
     const term = search.trim().toLowerCase()
     const searched = term 
-      ? roleBasedData.filter(r => 
-          [r.custname, r.custno, r.payterm].some(v => String(v || '').toLowerCase().includes(term))
+      ? filtered.filter(r => 
+          [r.custname, r.custno, r.payterm, r.record_status, r.totalTransactions, r.totalSpend, formatCurrency(r.totalSpend)].some(v => String(v || '').toLowerCase().includes(term))
         )
-      : roleBasedData
+      : filtered
+
+    const direction = sortConfig.direction === 'asc' ? 1 : -1
+    const sorted = [...searched].sort((a, b) => {
+      const aValue = a[sortConfig.key]
+      const bValue = b[sortConfig.key]
+
+      if (typeof aValue === 'number' || typeof bValue === 'number') {
+        return (Number(aValue || 0) - Number(bValue || 0)) * direction
+      }
+
+      return String(aValue || '').localeCompare(String(bValue || '')) * direction
+    })
 
     // 2. Card Logic: Calculate ACTIVE and INACTIVE counts for cards
     const activeCount = rows.filter(r => String(r.record_status || '').toUpperCase() === 'ACTIVE').length
@@ -48,10 +67,36 @@ function CustomerSalesSummary({ user_type = 'USER' }) {
     const totalSpend = searched.reduce((sum, r) => sum + (r.totalSpend || 0), 0)
 
     return { 
-      filteredRows: searched, 
+      filteredRows: sorted, 
       stats: { activeCount, inactiveCount, totalTransactions, totalSpend } 
     }
-  }, [rows, search, isAdmin])
+  }, [rows, search, isAdmin, paytermFilter, statusFilter, sortConfig])
+
+  const paytermOptions = useMemo(() => {
+    return [...new Set(rows.map((row) => row.payterm).filter(Boolean))].sort()
+  }, [rows])
+
+  const statusOptions = useMemo(() => {
+    return [...new Set(rows.map((row) => String(row.record_status || '').toUpperCase()).filter(Boolean))].sort()
+  }, [rows])
+
+  const handleSort = (key) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const sortLabel = (key, label) => {
+    const active = sortConfig.key === key
+    const SortIcon = sortConfig.direction === 'asc' ? ChevronUp : ChevronDown
+    return (
+      <>
+        <span>{label}</span>
+        {active && <SortIcon className="sort-side-icon" size={13} />}
+      </>
+    )
+  }
 
   return (
     <div className="reports-page">
@@ -63,9 +108,31 @@ function CustomerSalesSummary({ user_type = 'USER' }) {
             <p className="reports-subtitle">Transaction history and account status.</p>
           </div>
         </div>
-        <div className="reports-search">
-          <Search size={14} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." />
+        <div className="reports-filters">
+          <div className="reports-search">
+            <Search size={14} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search customer, pay, status, amount..." />
+          </div>
+          <FilterDropdown
+            label="Pay Term"
+            value={paytermFilter}
+            onChange={setPaytermFilter}
+            options={[
+              { value: 'ALL', label: 'All Pay Terms' },
+              ...paytermOptions.map((payterm) => ({ value: payterm, label: payterm })),
+            ]}
+          />
+          {isAdmin && (
+            <FilterDropdown
+              label="Status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: 'ALL', label: 'All Status' },
+                ...statusOptions.map((status) => ({ value: status, label: status })),
+              ]}
+            />
+          )}
         </div>
       </div>
 
@@ -110,11 +177,11 @@ function CustomerSalesSummary({ user_type = 'USER' }) {
           <table className="reports-table">
             <thead>
               <tr>
-                <th>Customer</th>
-                <th>Pay Term</th>
-                <th style={{ textAlign: 'right' }}>Transactions</th>
-                <th style={{ textAlign: 'right' }}>Total Spend</th>
-                {isAdmin && <th>Status</th>}
+                <th><button type="button" className="reports-sort-btn" onClick={() => handleSort('custname')}>{sortLabel('custname', 'Customer')}</button></th>
+                <th><button type="button" className="reports-sort-btn" onClick={() => handleSort('payterm')}>{sortLabel('payterm', 'Pay Term')}</button></th>
+                <th><button type="button" className="reports-sort-btn" onClick={() => handleSort('totalTransactions')}>{sortLabel('totalTransactions', 'Transactions')}</button></th>
+                <th><button type="button" className="reports-sort-btn" onClick={() => handleSort('totalSpend')}>{sortLabel('totalSpend', 'Total Spend')}</button></th>
+                {isAdmin && <th><button type="button" className="reports-sort-btn" onClick={() => handleSort('record_status')}>{sortLabel('record_status', 'Status')}</button></th>}
               </tr>
             </thead>
             <tbody>
@@ -125,8 +192,8 @@ function CustomerSalesSummary({ user_type = 'USER' }) {
                     <div className="reports-code-cell">{row.custno}</div>
                   </td>
                   <td><span className="payterm-badge">{row.payterm || '-'}</span></td>
-                  <td style={{ textAlign: 'right' }}>{row.totalTransactions.toLocaleString()}</td>
-                  <td className="reports-money-cell" style={{ textAlign: 'right' }}>
+                  <td>{row.totalTransactions.toLocaleString()}</td>
+                  <td className="reports-money-cell">
                     {formatCurrency(row.totalSpend)}
                   </td>
                   {isAdmin && (

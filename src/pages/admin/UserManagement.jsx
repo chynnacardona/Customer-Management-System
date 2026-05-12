@@ -17,8 +17,18 @@ function normalizeStatus(status) {
   return String(status || '').toUpperCase()
 }
 
-function getStatusTone(status) {
-  return normalizeStatus(status) === 'ACTIVE' ? 'active' : 'inactive'
+function getDisplayName(user) {
+  const fullName = String(user.full_name || '').trim()
+  if (fullName && fullName.toLowerCase() !== 'admin user') return fullName
+
+  const emailName = String(user.email || '')
+    .split('@')[0]
+    .replace(/[._-]+/g, ' ')
+    .trim()
+
+  return emailName
+    ? emailName.replace(/\b\w/g, (letter) => letter.toUpperCase())
+    : 'No Name'
 }
 
 function UserManagement() {
@@ -116,7 +126,7 @@ function UserManagement() {
         metadata: { email: user.email, userType: user.user_type },
       })
       setNoticeTone(nextStatus === 'ACTIVE' ? 'success' : 'warning')
-      setNotice(`${user.full_name || user.email} is now ${nextStatus.toLowerCase()}.`)
+      setNotice(`${getDisplayName(user) || user.email} is now ${nextStatus.toLowerCase()}.`)
     } catch (err) {
       setError(err.message || 'Update failed: You may not have permission.')
     } finally {
@@ -186,7 +196,9 @@ function UserManagement() {
           display: flex;
           align-items: center;
           gap: 8px;
+          flex: 0 1 340px;
           min-width: 280px;
+          max-width: 340px;
           background: rgba(100, 160, 255, 0.04);
           border: 1px solid rgba(100, 160, 255, 0.1);
           border-radius: 10px;
@@ -209,9 +221,13 @@ function UserManagement() {
         .admin-filters {
           display: flex;
           align-items: center;
-          gap: 8px;
-          flex-wrap: wrap;
+          gap: 10px;
+          flex-wrap: nowrap;
           justify-content: flex-end;
+        }
+
+        .admin-filters .filter-dropdown {
+          flex: 0 0 148px;
         }
 
         .admin-stat-grid {
@@ -310,6 +326,8 @@ function UserManagement() {
 
         .admin-users-table th.role-col,
         .admin-users-table td.role-col,
+        .admin-users-table th.username-col,
+        .admin-users-table td.username-col,
         .admin-users-table th.status-col,
         .admin-users-table td.status-col,
         .admin-users-table th.actions-col,
@@ -317,6 +335,7 @@ function UserManagement() {
           text-align: center;
         }
 
+        .admin-users-table td.username-col,
         .admin-users-table td.role-col,
         .admin-users-table td.status-col,
         .admin-users-table td.actions-col {
@@ -344,8 +363,10 @@ function UserManagement() {
         .admin-user-name {
           display: flex;
           flex-direction: column;
+          align-items: center;
           gap: 3px;
           min-width: 0;
+          text-align: center;
         }
 
         .admin-user-name strong {
@@ -466,11 +487,17 @@ function UserManagement() {
         @media (max-width: 720px) {
           .admin-search {
             min-width: 100%;
+            max-width: none;
           }
 
           .admin-filters {
             width: 100%;
+            flex-wrap: wrap;
             justify-content: stretch;
+          }
+
+          .admin-filters .filter-dropdown {
+            flex: 1 1 148px;
           }
 
           .admin-stat-grid {
@@ -552,8 +579,7 @@ function UserManagement() {
               <table className="admin-users-table">
                 <thead>
                   <tr>
-                    <th>User ID</th>
-                    <th>Username</th>
+                    <th className="username-col">Username</th>
                     <th className="role-col">User Type</th>
                     <th className="status-col">Status</th>
                     <th className="actions-col">Actions</th>
@@ -564,12 +590,13 @@ function UserManagement() {
                     const isSuper = user.user_type === 'SUPERADMIN'
                     const isActive = normalizeStatus(user.record_status) === 'ACTIVE'
                     const isUpdating = actionUserId === user.userId
+                    const displayName = getDisplayName(user)
 
                     return (
                       <tr key={user.userId}>
-                        <td>
-                          <div className="flex flex-col">
-                            <strong className="text-white">{user.full_name || 'No Name'}</strong>
+                        <td className="username-col">
+                          <div className="admin-user-name">
+                            <strong className="text-white">{displayName}</strong>
                             <span className="text-blue-200/40 text-xs">{user.email}</span>
                           </div>
                         </td>
@@ -596,7 +623,7 @@ function UserManagement() {
                             </span>
 
                           ) : (
-                            <div className="flex gap-2">
+                            <div className="admin-action-group">
                               <button
                                 className="admin-action-btn activate"
                                 disabled={isActive || isUpdating}

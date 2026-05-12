@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Search, ShoppingCart } from 'lucide-react'
+import { ChevronDown, ChevronUp, Loader2, Search, ShoppingCart } from 'lucide-react'
 import FilterDropdown from '../../components/shared/FilterDropdown'
+import DatePickerField from '../../components/shared/DatePickerField'
 import { getSales } from '../../services/salesProductApi'
 
 export default function SalesList() {
   const [sales, setSales] = useState([])
   const [search, setSearch] = useState('')
   const [customerFilter, setCustomerFilter] = useState('ALL')
-  const [monthFilter, setMonthFilter] = useState('ALL')
+  const [dateRangeMode, setDateRangeMode] = useState('ALL')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [sortConfig, setSortConfig] = useState({ key: 'salesdate', direction: 'desc' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -31,19 +35,34 @@ export default function SalesList() {
   const filteredSales = useMemo(() => {
     const term = search.toLowerCase().trim()
 
-    return sales.filter((sale) => {
-      const saleMonth = String(sale.salesdate || '').slice(0, 7)
+    const filtered = sales.filter((sale) => {
+      const saleDate = sale.salesdate ? String(sale.salesdate).slice(0, 10) : ''
+      const displayDate = sale.salesdate ? new Date(sale.salesdate).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : ''
+      const searchable = [
+        sale.transno,
+        sale.salesdate,
+        displayDate,
+        sale.custno,
+        sale.customer?.custname,
+        sale.total_amount,
+      ]
       const matchesSearch =
         !term ||
-        sale.transno?.toLowerCase().includes(term) ||
-        sale.custno?.toLowerCase().includes(term) ||
-        sale.customer?.custname?.toLowerCase().includes(term)
+        searchable.some((value) => String(value || '').toLowerCase().includes(term))
       const matchesCustomer = customerFilter === 'ALL' || sale.custno === customerFilter
-      const matchesMonth = monthFilter === 'ALL' || saleMonth === monthFilter
+      const matchesDateFrom = !dateFrom || saleDate >= dateFrom
+      const matchesDateTo = !dateTo || saleDate <= dateTo
 
-      return matchesSearch && matchesCustomer && matchesMonth
+      return matchesSearch && matchesCustomer && matchesDateFrom && matchesDateTo
     })
-  }, [customerFilter, monthFilter, sales, search])
+
+    const direction = sortConfig.direction === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      const aValue = sortConfig.key === 'customer' ? a.customer?.custname : a[sortConfig.key]
+      const bValue = sortConfig.key === 'customer' ? b.customer?.custname : b[sortConfig.key]
+      return String(aValue || '').localeCompare(String(bValue || '')) * direction
+    })
+  }, [customerFilter, dateFrom, dateTo, sales, search, sortConfig])
 
   const customerOptions = useMemo(() => {
     const unique = new Map()
@@ -53,11 +72,23 @@ export default function SalesList() {
     return [...unique.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1])))
   }, [sales])
 
-  const monthOptions = useMemo(() => {
-    return [...new Set(sales.map((sale) => String(sale.salesdate || '').slice(0, 7)).filter(Boolean))]
-      .sort()
-      .reverse()
-  }, [sales])
+  const handleSort = (key) => {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const sortLabel = (key, label) => {
+    const active = sortConfig.key === key
+    const SortIcon = sortConfig.direction === 'asc' ? ChevronUp : ChevronDown
+    return (
+      <>
+        <span>{label}</span>
+        {active && <SortIcon className="sort-side-icon" size={13} />}
+      </>
+    )
+  }
 
   return (
     <>
@@ -153,6 +184,31 @@ export default function SalesList() {
           gap: 8px;
           flex-wrap: wrap;
           justify-content: flex-end;
+        }
+
+        .sales-sort-btn {
+          border: 0;
+          padding: 0;
+          background: transparent;
+          color: inherit;
+          font: inherit;
+          text-transform: inherit;
+          letter-spacing: inherit;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+        }
+
+        .sales-sort-btn:hover {
+          color: rgba(224, 242, 254, 0.96);
+        }
+
+        .sort-side-icon {
+          color: rgba(56, 189, 248, 0.95);
+          flex-shrink: 0;
+          stroke-width: 2.8;
         }
 
         .sales-card {
@@ -261,7 +317,7 @@ export default function SalesList() {
         .sales-table td {
           padding: 14px 20px;
           border-bottom: 1px solid rgba(100, 160, 255, 0.06);
-          text-align: left;
+          text-align: center;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -347,7 +403,7 @@ export default function SalesList() {
           <div className="sales-filters">
             <div className="sales-search">
               <Search size={14} style={{ color: 'rgba(180, 210, 255, 0.28)' }} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sales..." />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search trans no, date, cust no..." />
             </div>
             <FilterDropdown
               label="Customer"
@@ -359,14 +415,26 @@ export default function SalesList() {
               ]}
             />
             <FilterDropdown
-              label="Month"
-              value={monthFilter}
-              onChange={setMonthFilter}
+              label="Range"
+              value={dateRangeMode}
+              onChange={(value) => {
+                setDateRangeMode(value)
+                if (value === 'ALL') {
+                  setDateFrom('')
+                  setDateTo('')
+                }
+              }}
               options={[
-                { value: 'ALL', label: 'All Months' },
-                ...monthOptions.map((month) => ({ value: month, label: month })),
+                { value: 'ALL', label: 'All Dates' },
+                { value: 'CUSTOM', label: 'Custom Range' },
               ]}
             />
+            {dateRangeMode === 'CUSTOM' && (
+              <>
+                <DatePickerField value={dateFrom} onChange={setDateFrom} label="Sales date from" />
+                <DatePickerField value={dateTo} onChange={setDateTo} label="Sales date to" />
+              </>
+            )}
           </div>
         </div>
 
@@ -385,10 +453,10 @@ export default function SalesList() {
               <table className="sales-table">
                 <thead>
                   <tr>
-                    <th>Trans No.</th>
-                    <th>Sales Date</th>
-                    <th>Cust No.</th>
-                    <th>Customer</th>
+                    <th><button type="button" className="sales-sort-btn" onClick={() => handleSort('transno')}>{sortLabel('transno', 'Trans No.')}</button></th>
+                    <th><button type="button" className="sales-sort-btn" onClick={() => handleSort('salesdate')}>{sortLabel('salesdate', 'Sales Date')}</button></th>
+                    <th><button type="button" className="sales-sort-btn" onClick={() => handleSort('custno')}>{sortLabel('custno', 'Cust No.')}</button></th>
+                    <th><button type="button" className="sales-sort-btn" onClick={() => handleSort('customer')}>{sortLabel('customer', 'Customer')}</button></th>
                   </tr>
                 </thead>
                 <tbody>

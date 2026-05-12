@@ -35,7 +35,11 @@ BEGIN
         VALUES (
             NEW.id, 
             NEW.email, 
-            COALESCE(NEW.raw_user_meta_data->>'full_name', 'Admin User'), 
+            COALESCE(
+                NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
+                NULLIF(NEW.raw_user_meta_data->>'name', ''),
+                INITCAP(REPLACE(SPLIT_PART(NEW.email, '@', 1), '.', ' '))
+            ), 
             initial_role, 
             initial_status
         );
@@ -81,3 +85,18 @@ CREATE TRIGGER tr_provision_on_login
   FOR EACH ROW 
   WHEN (OLD.last_sign_in_at IS DISTINCT FROM NEW.last_sign_in_at) -- Detects a fresh login
   EXECUTE PROCEDURE public.handle_user_provisioning();
+
+-- 5. Repair previously provisioned Google users that were saved as "Admin User"
+UPDATE public."user" public_user
+SET full_name = COALESCE(
+    NULLIF(auth_user.raw_user_meta_data->>'full_name', ''),
+    NULLIF(auth_user.raw_user_meta_data->>'name', ''),
+    INITCAP(REPLACE(SPLIT_PART(auth_user.email, '@', 1), '.', ' '))
+)
+FROM auth.users auth_user
+WHERE public_user."userId" = auth_user.id
+  AND (
+    public_user.full_name IS NULL
+    OR TRIM(public_user.full_name) = ''
+    OR LOWER(public_user.full_name) = 'admin user'
+  );

@@ -8,6 +8,7 @@ import {
   Download,
   LineChart as LineChartIcon,
   Loader2,
+  X,
   ShoppingBag,
   ShoppingCart,
   Users,
@@ -118,6 +119,7 @@ function Dashboard() {
   const [auditPreview, setAuditPreview] = useState([])
   const [privilegedActivity, setPrivilegedActivity] = useState([])
   const [auditNotice, setAuditNotice] = useState('')
+  const [openNotificationPanel, setOpenNotificationPanel] = useState(null)
 
   const currentRole = String(user?.user_type || 'USER').toUpperCase()
   const isAdminView = currentRole === 'ADMIN'
@@ -379,6 +381,11 @@ function Dashboard() {
   }, [pendingActivationRows.length, recentTransactions, filteredCustomers.length, statusBreakdown])
 
   const greetingName = user?.full_name || user?.email?.split('@')?.[0] || 'Staff User'
+  const reminderItems = isSuperAdminView
+    ? ['Review ADMIN actions from audit feed every day.', 'Prioritize pending USER activations before noon.', 'Check deleted customers for valid recovery requests.']
+    : isAdminView
+      ? ['Check pending account activations in Admin module.', 'Review deleted customers before recovery requests pile up.', 'Use customer filters to monitor active accounts.']
+      : ['Review recent transactions before end of day.', 'Use filters to focus on your assigned pay term groups.', 'Check Customer page for profile-level sales details.']
 
   const handleExportCsv = () => {
     const rows = recentTransactions.map((item) => [
@@ -427,6 +434,215 @@ function Dashboard() {
 
         {exportNotice && <div className="dashboard-notice">{exportNotice}</div>}
         {error && <div className="dashboard-error">{error}</div>}
+
+        <section className="dashboard-focus-grid">
+          {!isPrivilegedView && (
+            <>
+              <article className="dashboard-card focus-card wide-focus">
+                <div className="dashboard-card-head">
+                  <h2>Recent Transactions</h2>
+                  <Link to="/sales" className="dashboard-head-link">Open Sales <ArrowRight size={13} /></Link>
+                </div>
+                <div className="dashboard-table-wrap">
+                  <table className="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Trans No</th>
+                        <th>Date</th>
+                        <th>Customer</th>
+                        <th>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentTransactions.length === 0 ? (
+                        <tr><td colSpan={4} className="empty-cell">No transactions in selected range.</td></tr>
+                      ) : (
+                        recentTransactions.slice(0, 5).map((item) => (
+                          <tr key={`focus-${item.transNo}-${item.salesDate}`}>
+                            <td>{item.transNo}</td>
+                            <td>{toDateLabel(item.salesDate)}</td>
+                            <td>{item.customerName}</td>
+                            <td className="money">{formatCurrency(item.amount)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+
+              <article className="dashboard-card focus-card">
+                <div className="dashboard-card-head">
+                  <h2>Daily Shortcuts</h2>
+                </div>
+                <div className="quick-actions">
+                  <Link to="/customers" className="quick-action">View Customers <ArrowRight size={14} /></Link>
+                  <Link to="/sales" className="quick-action">View Sales <ArrowRight size={14} /></Link>
+                  <Link to="/products" className="quick-action">View Products <ArrowRight size={14} /></Link>
+                </div>
+              </article>
+            </>
+          )}
+
+          {isAdminView && (
+            <>
+              <article className="dashboard-card focus-card">
+                <div className="dashboard-card-head">
+                  <h2>Admin Priorities</h2>
+                  <Link to="/admin" className="dashboard-head-link">Manage <ArrowRight size={13} /></Link>
+                </div>
+                <div className="priority-list">
+                  {priorities.map((item) => (
+                    <div key={`admin-${item.label}`} className={`priority-item ${item.tone}`}>
+                      <span>{item.label}</span>
+                      <strong>{item.count}</strong>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="dashboard-card focus-card">
+                <div className="dashboard-card-head">
+                  <h2>Account Queue</h2>
+                </div>
+                <div className="priority-list">
+                  <div className="priority-item warning"><span>Pending USER activation</span><strong>{adminStats.pendingUsers}</strong></div>
+                  <div className="priority-item info"><span>Active Staff</span><strong>{adminStats.activeStaff}</strong></div>
+                  <div className="priority-item danger"><span>Deleted Customers</span><strong>{adminStats.deletedCustomers}</strong></div>
+                </div>
+              </article>
+
+              <article className="dashboard-card focus-card">
+                <div className="dashboard-card-head">
+                  <h2>Admin Shortcuts</h2>
+                </div>
+                <div className="quick-actions">
+                  <Link to="/admin" className="quick-action">Manage Users <ArrowRight size={14} /></Link>
+                  <Link to="/deleted-customers" className="quick-action">Review Deleted Customers <ArrowRight size={14} /></Link>
+                  <Link to="/customers" className="quick-action">Customer Directory <ArrowRight size={14} /></Link>
+                </div>
+              </article>
+            </>
+          )}
+
+          {isSuperAdminView && (
+            <>
+              <article className="dashboard-card focus-card">
+                <div className="dashboard-card-head">
+                  <h2>System Overview</h2>
+                  <Link to="/audit-logs" className="dashboard-head-link">Audit Logs <ArrowRight size={13} /></Link>
+                </div>
+                <div className="priority-list">
+                  <div className="priority-item info"><span>System Health</span><strong>{superOverview.systemHealth}</strong></div>
+                  <div className="priority-item warning"><span>Recent Active Logins</span><strong>{superOverview.recentLogins}</strong></div>
+                  <div className="priority-item danger"><span>Open Alerts</span><strong>{superOverview.openAlerts}</strong></div>
+                </div>
+              </article>
+
+              <article className="dashboard-card focus-card">
+                <div className="dashboard-card-head">
+                  <h2>Security Watch</h2>
+                </div>
+                {auditNotice ? (
+                  <div className="alert-item warning">{auditNotice}</div>
+                ) : (
+                  <div className="mini-list">
+                    {auditPreview.length === 0 ? (
+                      <div className="alert-item info">No flagged audit entries.</div>
+                    ) : (
+                      auditPreview.slice(0, 4).map((log) => (
+                        <div className="mini-list-item static" key={`focus-${log.id || `${log.actor_user_id}-${log.created_at}`}`}>
+                          <span>{log.action || 'Action logged'}</span>
+                          <small>{log.actor_email || log.actor_user_id || 'Unknown'} - {toDateLabel(log.created_at)}</small>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </article>
+
+              <article className="dashboard-card focus-card">
+                <div className="dashboard-card-head">
+                  <h2>Superadmin Shortcuts</h2>
+                </div>
+                <div className="quick-actions">
+                  <Link to="/admin" className="quick-action">Manage Users <ArrowRight size={14} /></Link>
+                  <Link to="/audit-logs" className="quick-action">Open Audit Logs <ArrowRight size={14} /></Link>
+                  <Link to="/deleted-customers" className="quick-action">Deleted Customers <ArrowRight size={14} /></Link>
+                </div>
+              </article>
+            </>
+          )}
+        </section>
+
+        <section className="dashboard-notifications-grid">
+          <button
+            type="button"
+            className="dashboard-notification-trigger alerts"
+            onClick={() => setOpenNotificationPanel('alerts')}
+          >
+            <span className="notification-trigger-icon"><Bell size={17} /></span>
+            <span className="notification-trigger-copy">
+              <strong>Notifications</strong>
+              <small>{alerts.length || 'No'} active alert{alerts.length === 1 ? '' : 's'}</small>
+            </span>
+            <ArrowRight size={15} />
+          </button>
+
+          <button
+            type="button"
+            className="dashboard-notification-trigger reminders"
+            onClick={() => setOpenNotificationPanel('reminders')}
+          >
+            <span className="notification-trigger-icon"><AlertTriangle size={17} /></span>
+            <span className="notification-trigger-copy">
+              <strong>Reminders</strong>
+              <small>{reminderItems.length} role-specific note{reminderItems.length === 1 ? '' : 's'}</small>
+            </span>
+            <ArrowRight size={15} />
+          </button>
+        </section>
+
+        {openNotificationPanel && (
+          <div className="dashboard-modal-overlay" onClick={() => setOpenNotificationPanel(null)}>
+            <section className="dashboard-notification-modal" onClick={(event) => event.stopPropagation()}>
+              <button
+                type="button"
+                className="dashboard-modal-close"
+                onClick={() => setOpenNotificationPanel(null)}
+                aria-label="Close notifications"
+              >
+                <X size={17} />
+              </button>
+
+              <div className="dashboard-modal-head">
+                <span className="notification-trigger-icon">
+                  {openNotificationPanel === 'alerts' ? <Bell size={18} /> : <AlertTriangle size={18} />}
+                </span>
+                <div>
+                  <h2>{openNotificationPanel === 'alerts' ? 'Important Notifications' : 'Helpful Reminders'}</h2>
+                  <p>{openNotificationPanel === 'alerts' ? 'Current dashboard alerts that need attention.' : 'Role-specific reminders for today.'}</p>
+                </div>
+              </div>
+
+              {openNotificationPanel === 'alerts' ? (
+                <div className="alert-list modal-list">
+                  {alerts.length === 0 ? (
+                    <div className="alert-item info">No active dashboard notifications.</div>
+                  ) : (
+                    alerts.map((alert) => (
+                      <div key={`modal-notification-${alert.text}`} className={`alert-item ${alert.tone}`}>{alert.text}</div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <ul className="reminders modal-reminders">
+                  {reminderItems.map((item) => <li key={`modal-${item}`}>{item}</li>)}
+                </ul>
+              )}
+            </section>
+          </div>
+        )}
 
         <section className="dashboard-kpi-grid">
           <article className="dashboard-kpi-card kpi-tone-customers">
@@ -490,7 +706,7 @@ function Dashboard() {
           )}
         </section>
 
-        <section className="dashboard-main-grid">
+        <section className="dashboard-main-grid secondary-section">
           <article className="dashboard-card chart-card">
             <div className="dashboard-card-head">
               <h2><LineChartIcon size={16} /> Sales Trend</h2>
@@ -519,17 +735,19 @@ function Dashboard() {
               </div>
             )}
           </article>
-
           <article className="dashboard-card">
             <div className="dashboard-card-head">
-              <h2><AlertTriangle size={16} /> Risk Alerts</h2>
+              <h2>New Customers</h2>
             </div>
-            <div className="alert-list">
-              {alerts.length === 0 ? (
-                <div className="alert-item info">No active risks. Dashboard is healthy.</div>
+            <div className="mini-list">
+              {newestCustomers.length === 0 ? (
+                <div className="alert-item info">No customers available.</div>
               ) : (
-                alerts.map((alert) => (
-                  <div key={alert.text} className={`alert-item ${alert.tone}`}>{alert.text}</div>
+                newestCustomers.map((customer) => (
+                  <Link className="mini-list-item" key={`chart-side-${customer.custno}`} to={`/customers/${customer.custno}`}>
+                    <span>{customer.custname || customer.custno}</span>
+                    <small>{customer.custno} - {customer.payterm || 'N/A'}</small>
+                  </Link>
                 ))
               )}
             </div>
@@ -703,127 +921,10 @@ function Dashboard() {
             </div>
           </article>
 
-          {!isPrivilegedView && (
-            <>
-              <article className="dashboard-card">
-                <div className="dashboard-card-head">
-                  <h2>Quick Actions</h2>
-                </div>
-                <div className="quick-actions">
-                  <Link to="/customers" className="quick-action">View Customers <ArrowRight size={14} /></Link>
-                  <Link to="/sales" className="quick-action">View Sales <ArrowRight size={14} /></Link>
-                  <Link to="/products" className="quick-action">View Products <ArrowRight size={14} /></Link>
-                </div>
-              </article>
-
-              <article className="dashboard-card">
-                <div className="dashboard-card-head">
-                  <h2><Bell size={16} /> Helpful Reminders</h2>
-                </div>
-                <ul className="reminders">
-                  <li>Review recent transactions before end of day.</li>
-                  <li>Use filters to focus on your assigned pay term groups.</li>
-                  <li>Check Customer page for profile-level sales details.</li>
-                </ul>
-              </article>
-            </>
-          )}
         </section>
-
-        {isPrivilegedView && (
-          <>
-            <section className="dashboard-two-col-grid">
-              <article className="dashboard-card">
-                <div className="dashboard-card-head">
-                  <h2>Quick Actions</h2>
-                </div>
-                <div className="quick-actions">
-                  <Link to="/customers" className="quick-action">View Customers <ArrowRight size={14} /></Link>
-                  <Link to="/sales" className="quick-action">View Sales <ArrowRight size={14} /></Link>
-                  <Link to="/products" className="quick-action">View Products <ArrowRight size={14} /></Link>
-                  <Link to="/admin" className="quick-action">Manage Users <ArrowRight size={14} /></Link>
-                  <Link to="/deleted-customers" className="quick-action">Review Deleted Customers <ArrowRight size={14} /></Link>
-                  {isSuperAdminView && <Link to="/admin/audit-logs" className="quick-action">Open Audit Logs <ArrowRight size={14} /></Link>}
-                </div>
-              </article>
-
-              <article className="dashboard-card">
-                <div className="dashboard-card-head">
-                  <h2><Bell size={16} /> Helpful Reminders</h2>
-                </div>
-                <ul className="reminders">
-                  <li>Review recent transactions before end of day.</li>
-                  <li>Use filters to focus on your assigned pay term groups.</li>
-                  <li>{isSuperAdminView ? 'Review ADMIN actions from audit feed every day.' : 'Check pending account activations in Admin module.'}</li>
-                </ul>
-              </article>
-            </section>
-
-            <section className="dashboard-three-col-grid">
-              <article className="dashboard-card">
-                <div className="dashboard-card-head">
-                  <h2>Today's Priorities</h2>
-                </div>
-                <div className="priority-list">
-                  {priorities.map((item) => (
-                    <div key={item.label} className={`priority-item ${item.tone}`}>
-                      <span>{item.label}</span>
-                      <strong>{item.count}</strong>
-                    </div>
-                  ))}
-                </div>
-              </article>
-
-              <article className="dashboard-card">
-                <div className="dashboard-card-head">
-                  <h2>Audit Preview</h2>
-                </div>
-                {auditNotice ? (
-                  <div className="alert-item warning">{auditNotice}</div>
-                ) : (
-                  <div className="mini-list">
-                    {auditPreview.length === 0 ? (
-                      <div className="alert-item info">No flagged audit entries.</div>
-                    ) : (
-                      auditPreview.slice(0, 5).map((log) => (
-                        <div className="mini-list-item static" key={log.id || `${log.actor_user_id}-${log.created_at}`}>
-                          <span>{log.action || 'Action logged'}</span>
-                          <small>{log.actor_email || log.actor_user_id || 'Unknown'} - {toDateLabel(log.created_at)}</small>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </article>
-
-              <article className="dashboard-card">
-                <div className="dashboard-card-head">
-                  <h2>Help & Tips</h2>
-                </div>
-                <ul className="reminders">
-                  <li>Prioritize pending USER activations before noon.</li>
-                  <li>Review deleted customers for valid recovery requests.</li>
-                  <li>Use audit preview to spot unusual status updates.</li>
-                </ul>
-              </article>
-            </section>
-          </>
-        )}
 
         {isSuperAdminView && (
           <section className="dashboard-super-grid">
-            <article className="dashboard-card">
-              <div className="dashboard-card-head">
-                <h2>System Overview</h2>
-              </div>
-              <div className="priority-list">
-                <div className="priority-item info"><span>System Health</span><strong>{superOverview.systemHealth}</strong></div>
-                <div className="priority-item warning"><span>Recent Active Logins</span><strong>{superOverview.recentLogins}</strong></div>
-                <div className="priority-item danger"><span>Open Alerts</span><strong>{superOverview.openAlerts}</strong></div>
-                <div className="priority-item info"><span>Roles Tracked</span><strong>{superOverview.totalRolesTracked}</strong></div>
-              </div>
-            </article>
-
             <article className="dashboard-card">
               <div className="dashboard-card-head">
                 <h2>Recent Privileged Activity</h2>
