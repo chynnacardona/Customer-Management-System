@@ -33,6 +33,7 @@ import { customerService } from '../../services/customerService'
 import { getAuditLogs } from '../../services/auditLogService'
 import { getSales } from '../../services/salesProductApi'
 import { useCurrencyFormatter } from '../../utils/currency'
+import { buildActorSnapshot } from '../../utils/stampAudit'
 import { supabase } from '../../supabase/supabaseClient'
 import './Dashboard.css'
 
@@ -267,6 +268,16 @@ function Dashboard() {
 
   const totalTransactions = filteredSales.length
 
+  const dashboardCustomers = useMemo(() => {
+    const currentYear = new Date().getFullYear()
+    if (safeYear >= currentYear) return filteredCustomers
+
+    const customersWithSalesInYear = new Set(filteredSales.map((row) => row.custno).filter(Boolean))
+    return filteredCustomers.filter((customer) => customersWithSalesInYear.has(customer.custno))
+  }, [filteredCustomers, filteredSales, safeYear])
+
+  const dashboardCustomerCount = dashboardCustomers.length
+
   const totalSalesAmount = useMemo(
     () => filteredSales.reduce((sum, row) => sum + parseSalesAmount(row), 0),
     [filteredSales]
@@ -312,11 +323,11 @@ function Dashboard() {
     const items = []
     if (error) items.push({ tone: 'danger', text: 'Some dashboard data failed to load. Try refresh.' })
     if (!loading && totalTransactions === 0) items.push({ tone: 'warning', text: `No transactions found for year ${safeYear}.` })
-    if (!loading && filteredCustomers.length < 5) items.push({ tone: 'info', text: 'Customer list is small. Check if import is complete.' })
+    if (!loading && dashboardCustomerCount < 5) items.push({ tone: 'info', text: 'Customer list is small. Check if import is complete.' })
     if (isPrivilegedView && auditNotice) items.push({ tone: 'warning', text: 'Audit preview is unavailable. Run latest audit migration.' })
     if (isSuperAdminView && pendingUsersCount > 0) items.push({ tone: 'danger', text: `${pendingUsersCount} USER account(s) pending activation.` })
     return items
-  }, [error, loading, totalTransactions, safeYear, filteredCustomers.length, isPrivilegedView, isSuperAdminView, auditNotice, pendingUsersCount])
+  }, [error, loading, totalTransactions, safeYear, dashboardCustomerCount, isPrivilegedView, isSuperAdminView, auditNotice, pendingUsersCount])
 
   const adminStats = useMemo(() => {
     const users = userRows || []
@@ -355,10 +366,10 @@ function Dashboard() {
   }, [userRows])
 
   const statusBreakdown = useMemo(() => {
-    const active = filteredCustomers.length
+    const active = dashboardCustomerCount
     const inactive = deletedCustomers.length
-    const withSales = filteredCustomers.filter((customer) =>
-      sales.some((sale) => sale.custno === customer.custno && parseSalesAmount(sale) > 0)
+    const withSales = dashboardCustomers.filter((customer) =>
+      filteredSales.some((sale) => sale.custno === customer.custno && parseSalesAmount(sale) > 0)
     ).length
     const withoutSales = Math.max(0, active - withSales)
     return [
@@ -367,7 +378,7 @@ function Dashboard() {
       { name: 'No Sales', value: withoutSales, color: '#f59e0b' },
       { name: 'Inactive', value: inactive, color: '#ef4444' },
     ].filter((x) => x.value > 0)
-  }, [filteredCustomers, deletedCustomers.length, sales])
+  }, [dashboardCustomerCount, dashboardCustomers, deletedCustomers.length, filteredSales])
 
   const priorities = useMemo(() => {
     const overdue = pendingActivationRows.length
@@ -380,7 +391,7 @@ function Dashboard() {
     ]
   }, [pendingActivationRows.length, recentTransactions, filteredCustomers.length, statusBreakdown])
 
-  const greetingName = user?.full_name || user?.email?.split('@')?.[0] || 'Staff User'
+  const greetingName = buildActorSnapshot({ authUser: user, userRole: currentRole }).name
   const reminderItems = isSuperAdminView
     ? ['Review ADMIN actions from audit feed every day.', 'Prioritize pending USER activations before noon.', 'Check deleted customers for valid recovery requests.']
     : isAdminView
@@ -648,7 +659,7 @@ function Dashboard() {
           <article className="dashboard-kpi-card kpi-tone-customers">
             <div className="dashboard-kpi-icon"><Users size={16} /></div>
             <span className="dashboard-kpi-label">Active Customers</span>
-            <strong className="dashboard-kpi-value">{filteredCustomers.length}</strong>
+            <strong className="dashboard-kpi-value">{dashboardCustomerCount}</strong>
           </article>
           <article className="dashboard-kpi-card kpi-tone-transactions">
             <div className="dashboard-kpi-icon"><ShoppingCart size={16} /></div>
@@ -716,8 +727,8 @@ function Dashboard() {
               <div className="dashboard-loading"><Loader2 className="spin" size={20} /> Loading chart...</div>
             ) : (
               <div className="chart-wrap">
-                <ResponsiveContainer width="100%" height={250}>
-                  <LineChart data={lineChartData}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={lineChartData} margin={{ top: 8, right: 14, bottom: 0, left: -18 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(126,184,255,0.18)" />
                     <XAxis dataKey="date" stroke="rgba(180,210,255,0.58)" tickLine={false} axisLine={false} />
                     <YAxis stroke="rgba(180,210,255,0.58)" tickLine={false} axisLine={false} />
@@ -734,23 +745,6 @@ function Dashboard() {
                 </ResponsiveContainer>
               </div>
             )}
-          </article>
-          <article className="dashboard-card">
-            <div className="dashboard-card-head">
-              <h2>New Customers</h2>
-            </div>
-            <div className="mini-list">
-              {newestCustomers.length === 0 ? (
-                <div className="alert-item info">No customers available.</div>
-              ) : (
-                newestCustomers.map((customer) => (
-                  <Link className="mini-list-item" key={`chart-side-${customer.custno}`} to={`/customers/${customer.custno}`}>
-                    <span>{customer.custname || customer.custno}</span>
-                    <small>{customer.custno} - {customer.payterm || 'N/A'}</small>
-                  </Link>
-                ))
-              )}
-            </div>
           </article>
         </section>
 
@@ -869,59 +863,6 @@ function Dashboard() {
             </article>
           </section>
         )}
-
-        <section className="dashboard-main-grid">
-          <article className="dashboard-card wide">
-            <div className="dashboard-card-head">
-              <h2>Recent Transactions</h2>
-            </div>
-            <div className="dashboard-table-wrap">
-              <table className="dashboard-table">
-                <thead>
-                  <tr>
-                    <th>Trans No</th>
-                    <th>Date</th>
-                    <th>Customer</th>
-                    <th>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentTransactions.length === 0 ? (
-                    <tr><td colSpan={4} className="empty-cell">No transactions in selected range.</td></tr>
-                  ) : (
-                    recentTransactions.map((item) => (
-                      <tr key={`${item.transNo}-${item.salesDate}`}>
-                        <td>{item.transNo}</td>
-                        <td>{toDateLabel(item.salesDate)}</td>
-                        <td>{item.customerName}</td>
-                        <td className="money">{formatCurrency(item.amount)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </article>
-
-          <article className="dashboard-card">
-            <div className="dashboard-card-head">
-              <h2>New Customers</h2>
-            </div>
-            <div className="mini-list">
-              {newestCustomers.length === 0 ? (
-                <div className="alert-item info">No customers available.</div>
-              ) : (
-                newestCustomers.map((customer) => (
-                  <Link className="mini-list-item" key={customer.custno} to={`/customers/${customer.custno}`}>
-                    <span>{customer.custname || customer.custno}</span>
-                    <small>{customer.custno} - {customer.payterm || 'N/A'}</small>
-                  </Link>
-                ))
-              )}
-            </div>
-          </article>
-
-        </section>
 
         {isSuperAdminView && (
           <section className="dashboard-super-grid">

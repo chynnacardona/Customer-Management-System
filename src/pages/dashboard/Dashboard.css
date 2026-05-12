@@ -406,6 +406,7 @@
 
 .secondary-section {
   margin-top: 2px;
+  grid-template-columns: 1fr;
 }
 
 .dashboard-admin-analytics-grid {
@@ -475,12 +476,27 @@
 }
 
 .chart-card {
-  min-height: 318px;
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  overflow: hidden;
 }
 
 .chart-wrap {
   width: 100%;
-  height: 260px;
+  flex: 1;
+  min-height: 286px;
+  height: 100%;
+}
+
+.chart-card .dashboard-card-head {
+  flex: 0 0 auto;
+  margin-bottom: 6px;
+}
+
+.chart-card .recharts-responsive-container {
+  min-height: 286px;
 }
 
 .dashboard-loading {
