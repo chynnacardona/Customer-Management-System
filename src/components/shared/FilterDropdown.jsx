@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown } from 'lucide-react'
 
-function FilterDropdown({ value, options, onChange, icon = null, label = 'Filter', className = '' }) {
+function FilterDropdown({ value, options, onChange, icon = null, label = 'Filter', className = '', disabled = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuStyle, setMenuStyle] = useState(null)
   const ref = useRef(null)
@@ -11,6 +11,7 @@ function FilterDropdown({ value, options, onChange, icon = null, label = 'Filter
 
   useEffect(() => {
     const handlePointerDown = (event) => {
+      if (disabled) return
       const isButtonClick = ref.current?.contains(event.target)
       const isMenuClick = menuRef.current?.contains(event.target)
       if (!isButtonClick && !isMenuClick) setIsOpen(false)
@@ -27,7 +28,7 @@ function FilterDropdown({ value, options, onChange, icon = null, label = 'Filter
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [])
+  }, [disabled])
 
   useLayoutEffect(() => {
     if (!isOpen || !ref.current) return undefined
@@ -66,7 +67,8 @@ function FilterDropdown({ value, options, onChange, icon = null, label = 'Filter
           role="option"
           aria-selected={option.value === value}
           key={option.value}
-          onClick={() => {
+        onClick={() => {
+            if (disabled) return
             onChange(option.value)
             setIsOpen(false)
           }}
@@ -85,7 +87,10 @@ function FilterDropdown({ value, options, onChange, icon = null, label = 'Filter
         className="filter-dropdown-button"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((current) => !current)}
+        disabled={disabled}
+        onClick={() => {
+          if (!disabled) setIsOpen((current) => !current)
+        }}
       >
         {icon && <span className="filter-dropdown-icon">{icon}</span>}
         <span className="filter-dropdown-text">{selected?.label || label}</span>
@@ -128,6 +133,12 @@ function FilterDropdown({ value, options, onChange, icon = null, label = 'Filter
           border-color: rgba(126, 184, 255, 0.28);
           background: rgba(126, 184, 255, 0.085);
           box-shadow: 0 0 0 3px rgba(46, 134, 245, 0.08);
+        }
+
+        .filter-dropdown-button:disabled {
+          opacity: 0.48;
+          cursor: wait;
+          box-shadow: none;
         }
 
         .filter-dropdown-icon {

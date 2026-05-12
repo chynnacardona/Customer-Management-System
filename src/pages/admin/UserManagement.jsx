@@ -455,24 +455,27 @@ function UserManagement() {
           border-color: rgba(196, 181, 253, 0.18);
         }
 
-        .admin-role-select {
-          min-width: 116px;
+        .admin-role-dropdown {
+          width: 128px;
+          min-width: 128px;
+          margin: 0 auto;
+        }
+
+        .admin-role-dropdown .filter-dropdown-button {
           min-height: 30px;
           border-radius: 999px;
-          border: 1px solid rgba(147, 197, 253, 0.18);
-          background: rgba(8, 18, 40, 0.82);
+          justify-content: center;
+          padding: 0 9px;
+          background: rgba(59, 130, 246, 0.09);
+          border-color: rgba(147, 197, 253, 0.18);
           color: rgba(235, 245, 255, 0.92);
           font-size: 10.5px;
           font-weight: 850;
-          text-align: center;
           text-transform: uppercase;
-          outline: none;
-          cursor: pointer;
         }
 
-        .admin-role-select:disabled {
-          opacity: 0.45;
-          cursor: wait;
+        .admin-role-dropdown .filter-dropdown-text {
+          flex: 0 1 auto;
         }
 
         .admin-status-badge.active {
@@ -667,17 +670,14 @@ function UserManagement() {
                         </td>
                         <td className="role-col">
                           {canEditUserType && !isSuper ? (
-                            <select
-                              className="admin-role-select"
+                            <FilterDropdown
+                              className="admin-role-dropdown"
+                              label="User type"
                               value={EDITABLE_USER_TYPES.includes(user.user_type) ? user.user_type : 'USER'}
                               disabled={isUpdating}
-                              onChange={(event) => handleUserTypeChange(user, event.target.value)}
-                              aria-label={`Change user type for ${displayName}`}
-                            >
-                              {EDITABLE_USER_TYPES.map((role) => (
-                                <option key={role} value={role}>{role}</option>
-                              ))}
-                            </select>
+                              onChange={(value) => handleUserTypeChange(user, value)}
+                              options={EDITABLE_USER_TYPES.map((role) => ({ value: role, label: role }))}
+                            />
                           ) : (
                             <span className={`admin-role-badge ${String(user.user_type).toLowerCase()}`}> 
                               {isSuper ? <ShieldCheck size={12} /> : <UserCog size={12} />}
