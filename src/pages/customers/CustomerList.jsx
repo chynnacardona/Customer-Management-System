@@ -43,6 +43,7 @@ function CustomerListPage() {
   const canAddCustomer = canAddCustomerByRights(rights)
   const canEditCustomer = canEditCustomerByRights(rights) && (isSuperAdmin || isAdmin)
   const canDeleteCustomer = isSuperAdmin 
+  const canShowCustomerActions = canEditCustomer || canDeleteCustomer
 
   // Component State
   const [customers, setCustomers] = useState([])
@@ -628,7 +629,7 @@ function CustomerListPage() {
                   <th><button type="button" className="customer-sort-btn" onClick={() => handleSort('address')}>{sortLabel('address', 'Address')}</button></th>
                   <th className="col-status"><button type="button" className="customer-sort-btn" onClick={() => handleSort('record_status')}>{sortLabel('record_status', 'Status')}</button></th>
                   {canSeeAuditHistory && <th className="col-hist" style={{textAlign:'center'}}>Stamp</th>}
-                  <th className="col-actions" style={{textAlign:'center'}}>Actions</th>
+                  {canShowCustomerActions && <th className="col-actions" style={{textAlign:'center'}}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -656,6 +657,7 @@ function CustomerListPage() {
                       </td>
                     )}
 
+                    {canShowCustomerActions && (
                     <td className="col-actions" onClick={(event) => event.stopPropagation()}>
                         <div className="action-container">
                           {/* Edit Button - SuperAdmin/Admin */}
@@ -669,6 +671,7 @@ function CustomerListPage() {
                           )}
                         </div>
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
