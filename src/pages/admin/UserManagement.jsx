@@ -11,7 +11,10 @@ import {
 } from 'lucide-react'
 import FilterDropdown from '../../components/shared/FilterDropdown'
 import { logAuditActivity } from '../../services/auditLogService'
-import { getUsers, activateUser, deactivateUser } from '../../services/adminApi'
+import { getUsers, activateUser, deactivateUser, updateUserType } from '../../services/adminApi'
+import { useRights } from '../../context/useRights'
+
+const EDITABLE_USER_TYPES = ['USER', 'ADMIN']
 
 function normalizeStatus(status) {
   return String(status || '').toUpperCase()
@@ -32,6 +35,7 @@ function getDisplayName(user) {
 }
 
 function UserManagement() {
+  const { userType } = useRights()
   const [users, setUsers] = useState([])
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('ALL')
@@ -41,6 +45,7 @@ function UserManagement() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [noticeTone, setNoticeTone] = useState('success')
+  const canEditUserType = String(userType || '').toUpperCase() === 'SUPERADMIN'
 
   // PR-01: Fetch Users using the Service Layer
   const loadUsers = useCallback(async () => {
@@ -129,6 +134,46 @@ function UserManagement() {
       setNotice(`${getDisplayName(user) || user.email} is now ${nextStatus.toLowerCase()}.`)
     } catch (err) {
       setError(err.message || 'Update failed: You may not have permission.')
+    } finally {
+      setActionUserId(null)
+    }
+  }
+
+  const handleUserTypeChange = async (user, nextUserType) => {
+    const normalizedType = String(nextUserType || '').toUpperCase()
+
+    if (!canEditUserType || user.user_type === 'SUPERADMIN' || user.user_type === normalizedType) return
+
+    try {
+      setActionUserId(user.userId)
+      setError('')
+      setNotice('')
+
+      await updateUserType(user.userId, normalizedType)
+
+      setUsers((currentUsers) =>
+        currentUsers.map((currentUser) =>
+          currentUser.userId === user.userId
+            ? { ...currentUser, user_type: normalizedType }
+            : currentUser
+        )
+      )
+
+      await logAuditActivity({
+        action: 'Updated user type',
+        entityType: 'user',
+        entityId: user.userId,
+        metadata: {
+          email: user.email,
+          previousUserType: user.user_type,
+          nextUserType: normalizedType,
+        },
+      })
+
+      setNoticeTone('success')
+      setNotice(`${getDisplayName(user) || user.email} is now ${normalizedType}.`)
+    } catch (err) {
+      setError(err.message || 'User type update failed. You may not have permission.')
     } finally {
       setActionUserId(null)
     }
@@ -410,6 +455,26 @@ function UserManagement() {
           border-color: rgba(196, 181, 253, 0.18);
         }
 
+        .admin-role-select {
+          min-width: 116px;
+          min-height: 30px;
+          border-radius: 999px;
+          border: 1px solid rgba(147, 197, 253, 0.18);
+          background: rgba(8, 18, 40, 0.82);
+          color: rgba(235, 245, 255, 0.92);
+          font-size: 10.5px;
+          font-weight: 850;
+          text-align: center;
+          text-transform: uppercase;
+          outline: none;
+          cursor: pointer;
+        }
+
+        .admin-role-select:disabled {
+          opacity: 0.45;
+          cursor: wait;
+        }
+
         .admin-status-badge.active {
           color: rgba(134, 239, 172, 0.95);
           background: rgba(34, 197, 94, 0.08);
@@ -601,10 +666,24 @@ function UserManagement() {
                           </div>
                         </td>
                         <td className="role-col">
-                          <span className={`admin-role-badge ${String(user.user_type).toLowerCase()}`}> 
-                            {isSuper ? <ShieldCheck size={12} /> : <UserCog size={12} />}
-                            {user.user_type || 'USER'}
-                          </span>
+                          {canEditUserType && !isSuper ? (
+                            <select
+                              className="admin-role-select"
+                              value={EDITABLE_USER_TYPES.includes(user.user_type) ? user.user_type : 'USER'}
+                              disabled={isUpdating}
+                              onChange={(event) => handleUserTypeChange(user, event.target.value)}
+                              aria-label={`Change user type for ${displayName}`}
+                            >
+                              {EDITABLE_USER_TYPES.map((role) => (
+                                <option key={role} value={role}>{role}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className={`admin-role-badge ${String(user.user_type).toLowerCase()}`}> 
+                              {isSuper ? <ShieldCheck size={12} /> : <UserCog size={12} />}
+                              {user.user_type || 'USER'}
+                            </span>
+                          )}
                         </td>
                         <td className="status-col">
                           <span className={`admin-status-badge ${normalizeStatus(user.record_status).toLowerCase()}`}> 
