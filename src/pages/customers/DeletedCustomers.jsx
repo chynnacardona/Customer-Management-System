@@ -5,6 +5,14 @@ import { useAuth } from '../../context/useAuth'
 import { supabase } from '../../supabase/supabaseClient'
 import { customerService } from '../../services/customerService'
 import { canManageDeletedCustomers } from '../../utils/accessRules'
+import {
+  appendCustomerStampEntry,
+  buildActorSnapshot,
+  createCustomerStampEntry,
+  decodeStampPayload,
+  prettifyEmailName,
+  resolveStampActor,
+} from '../../utils/stampAudit'
 
 // --- Formatting Helper Component ---
 function FormattedStamp({ stamp, userMap }) {
@@ -17,9 +25,15 @@ function FormattedStamp({ stamp, userMap }) {
   const date = parts[0];
   const time = parts.slice(1, 4).join(':');
   const userCode = parts[5]?.toLowerCase();
+  const actorData = decodeStampPayload(parts[9]);
+  const actor = resolveStampActor({
+    segments: parts,
+    actorData,
+    matchedDatabaseUser: userMap[userCode],
+  });
 
   // Fetch email from the pre-built map
-  const userEmail = userMap[userCode] || `${userCode}@hope.com`;
+  const userEmail = actor.email || `${userCode}@hope.com`;
 
   return (
     <div className="deleted-stamp" style={{ fontSize: '11.5px', lineHeight: '1.4' }}>
@@ -27,6 +41,9 @@ function FormattedStamp({ stamp, userMap }) {
         {date}/2026 | {time}
       </div>
       <div style={{ color: 'rgba(180, 210, 255, 0.7)', fontWeight: '600' }}>
+        {actor.name || prettifyEmailName(userEmail)}
+      </div>
+      <div style={{ color: 'rgba(180, 210, 255, 0.38)', fontWeight: '600' }}>
         {userEmail}
       </div>
     </div>
@@ -46,6 +63,10 @@ function DeletedCustomers() {
   const userRole = (user?.user_type ?? 'USER').toUpperCase()
   const isSuperAdmin = userRole === 'SUPERADMIN'
   const canViewDeletedCustomers = canManageDeletedCustomers(userRole)
+  const actorSnapshot = useMemo(
+    () => buildActorSnapshot({ authUser: user, userRole }),
+    [user, userRole]
+  )
 
   const loadDeletedCustomers = useCallback(async () => {
     if (!canViewDeletedCustomers) {
@@ -67,13 +88,13 @@ function DeletedCustomers() {
       if (prefixes.length > 0) {
         const { data: databaseUsers } = await supabase
           .from('user')
-          .select('email')
+          .select('full_name, email')
           .or(prefixes.map(p => `email.ilike.${p}%`).join(','));
 
         const mapping = {};
         databaseUsers?.forEach(dbUser => {
           const prefix = dbUser.email.split('@')[0].substring(0, 3).toLowerCase();
-          mapping[prefix] = dbUser.email;
+          mapping[prefix] = dbUser;
         });
         setUserMap(mapping);
       }
@@ -107,7 +128,16 @@ function DeletedCustomers() {
     try {
       setRecoveringCustno(customer.custno)
       setError('')
-      await customerService.recoverCustomer(customer.custno)
+      const { stamp: _, ...dataToSnapshot } = customer
+      const recoverStampEntry = createCustomerStampEntry({
+        actionType: 'U',
+        actor: actorSnapshot,
+        description: 'Recovered',
+        previousSnapshot: dataToSnapshot,
+      })
+      const updatedStampString = appendCustomerStampEntry(customer.stamp, recoverStampEntry)
+
+      await customerService.recoverCustomer(customer.custno, updatedStampString)
       await loadDeletedCustomers()
     } catch (err) {
       setError(err.message || 'Unable to recover customer.')

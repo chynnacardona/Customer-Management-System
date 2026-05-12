@@ -13,38 +13,13 @@ import {
   canAddCustomer as canAddCustomerByRights,
   canEditCustomer as canEditCustomerByRights,
 } from '../../utils/accessRules'
-
-const prettifyEmailName = (email = '') => {
-  const emailName = String(email)
-    .split('@')[0]
-    .replace(/[._-]+/g, ' ')
-    .trim()
-
-  return emailName
-    ? emailName.replace(/\b\w/g, (letter) => letter.toUpperCase())
-    : 'System User'
-}
-
-const isPlaceholderName = (name = '') => {
-  const normalized = String(name).trim().toLowerCase()
-  return !normalized || normalized === 'admin user'
-}
-
-const encodeStampPayload = (payload) => btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
-
-const decodeStampPayload = (payload) => {
-  if (!payload) return null
-
-  try {
-    return JSON.parse(decodeURIComponent(escape(atob(payload))))
-  } catch {
-    try {
-      return JSON.parse(atob(payload))
-    } catch {
-      return null
-    }
-  }
-}
+import {
+  appendCustomerStampEntry,
+  buildActorSnapshot,
+  createCustomerStampEntry,
+  decodeStampPayload,
+  resolveStampActor,
+} from '../../utils/stampAudit'
 
 function CustomerListPage() {
   const navigate = useNavigate()
@@ -52,16 +27,11 @@ function CustomerListPage() {
   const { rights, userType: rightsUserType } = useRights()
 
   // Identification and Permissions logic
-  const metadataName = authUser?.user_metadata?.full_name || authUser?.user_metadata?.name
-  const databaseName = authUser?.full_name && authUser.full_name.toLowerCase() !== 'admin user' ? authUser.full_name : ''
-  const actualDisplayName = databaseName || metadataName || prettifyEmailName(authUser?.email)
-  const actualEmail = authUser?.email ?? 'admin@hope.com'
   const userRole = (rightsUserType ?? authUser?.user_type ?? 'USER').toUpperCase()
-  const actorSnapshot = useMemo(() => ({
-    name: actualDisplayName,
-    email: actualEmail,
-    role: userRole,
-  }), [actualDisplayName, actualEmail, userRole])
+  const actorSnapshot = useMemo(
+    () => buildActorSnapshot({ authUser, userRole }),
+    [authUser, userRole]
+  )
 
   // Strict Role Checks
   const isSuperAdmin = userRole === 'SUPERADMIN'
@@ -197,10 +167,7 @@ function CustomerListPage() {
       const userCode = segments[5];
       const actorData = decodeStampPayload(segments[9]);
       const matchedDatabaseUser = fetchedUsers?.find(user => user.email.toLowerCase().startsWith(userCode?.toLowerCase()));
-      const databaseUserName = !isPlaceholderName(matchedDatabaseUser?.full_name) ? matchedDatabaseUser.full_name : ''
-      const actorName = !isPlaceholderName(actorData?.name) ? actorData.name : ''
-      const actorEmail = actorData?.email || matchedDatabaseUser?.email || `${userCode}@hope.com`
-      const actorRole = actorData?.role || (segments[6] === 'S' ? 'SUPERADMIN' : (segments[6] === 'A' ? 'ADMIN' : 'USER'))
+      const actor = resolveStampActor({ segments, actorData, matchedDatabaseUser })
 
       const rawDescription = segments[7] || '';
       const legacyMapping = { 'N': 'Name Update', 'A': 'Address Update', 'P': 'Pay Term Update', 'C': 'Record Creation', 'G': 'General Update' };
@@ -211,9 +178,9 @@ function CustomerListPage() {
         entryDateObject: entryDateObject,
         militaryTime: segments.slice(1, 4).join(':'),
         actionType: segments[4] === 'C' ? 'Created' : 'Updated',
-        userName: actorName || databaseUserName || prettifyEmailName(actorEmail),
-        userEmail: actorEmail,
-        systemRole: actorRole,
+        userName: actor.name,
+        userEmail: actor.email,
+        systemRole: actor.role,
         modificationDescription: finalDescription,
         previousRowSnapshot: decodeStampPayload(segments[8])
       };
@@ -282,18 +249,13 @@ function CustomerListPage() {
         : 'General Update';
 
       const { stamp: _, ...dataToSnapshot } = currentCustomerState;
-      const base64Snapshot = encodeStampPayload(dataToSnapshot); 
-
-      const now = new Date();
-      const monthDayString = `${now.getMonth() + 1}/${now.getDate()}`;
-      const timeString = now.toLocaleTimeString('en-GB', { hour12: false }); 
-      const userPrefix = actualEmail.split('@')[0].substring(0, 3);
-      
-      const actorPayload = encodeStampPayload(actorSnapshot);
-      const newHistoryEntry = `${monthDayString}:${timeString}:U:${userPrefix}:${userRole[0]}:${changeDescription}:${base64Snapshot}:${actorPayload}`;
-      const existingHistoryEntries = currentCustomerState?.stamp && currentCustomerState.stamp !== '-' ? currentCustomerState.stamp.split(';') : [];
-        
-      const updatedStampString = [newHistoryEntry, ...existingHistoryEntries].join(';');
+      const newHistoryEntry = createCustomerStampEntry({
+        actionType: 'U',
+        actor: actorSnapshot,
+        description: changeDescription,
+        previousSnapshot: dataToSnapshot,
+      })
+      const updatedStampString = appendCustomerStampEntry(currentCustomerState?.stamp, newHistoryEntry)
 
       await customerService.updateCustomer(customerNumber, { ...payload, stamp: updatedStampString });
       await fetchCustomersFromDatabase();
@@ -304,18 +266,26 @@ function CustomerListPage() {
   }
 
   const handleAddCustomer = async (payload) => {
-    const now = new Date();
-    const monthDayString = `${now.getMonth() + 1}/${now.getDate()}`;
-    const timeString = now.toLocaleTimeString('en-GB', { hour12: false });
-    const userPrefix = actualEmail.split('@')[0].substring(0, 3);
-    const actorPayload = encodeStampPayload(actorSnapshot);
-    const initialStamp = `${monthDayString}:${timeString}:C:${userPrefix}:${userRole[0]}:Record Created::${actorPayload}`;
+    const initialStamp = createCustomerStampEntry({
+      actionType: 'C',
+      actor: actorSnapshot,
+      description: 'Record Created',
+    })
     await customerService.addCustomer({ ...payload, stamp: initialStamp });
     await fetchCustomersFromDatabase();
   }
 
   const handleSoftDeleteCustomer = async (customer) => {
-    await customerService.softDeleteCustomer(customer.custno)
+    const { stamp: _, ...dataToSnapshot } = customer
+    const deleteStampEntry = createCustomerStampEntry({
+      actionType: 'U',
+      actor: actorSnapshot,
+      description: 'Soft Deleted',
+      previousSnapshot: dataToSnapshot,
+    })
+    const updatedStampString = appendCustomerStampEntry(customer.stamp, deleteStampEntry)
+
+    await customerService.softDeleteCustomer(customer.custno, updatedStampString)
     await fetchCustomersFromDatabase()
   }
 

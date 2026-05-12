@@ -44,10 +44,14 @@ export const customerService = {
     return data;
   },
 
-  softDeleteCustomer: async (custno) => {
+  softDeleteCustomer: async (custno, stamp = null) => {
+    const updates = stamp
+      ? { record_status: 'INACTIVE', stamp }
+      : { record_status: 'INACTIVE' };
+
     const { data, error } = await supabase
       .from('customer')
-      .update({ record_status: 'INACTIVE' })
+      .update(updates)
       .eq('custno', custno)
       .select();
     if (error) throw error;
@@ -59,10 +63,14 @@ export const customerService = {
     return data;
   },
 
-  recoverCustomer: async (custno) => {
+  recoverCustomer: async (custno, stamp = null) => {
+    const updates = stamp
+      ? { record_status: 'ACTIVE', stamp }
+      : { record_status: 'ACTIVE' };
+
     const { data, error } = await supabase
       .from('customer')
-      .update({ record_status: 'ACTIVE' })
+      .update(updates)
       .eq('custno', custno)
       .select();
     
