@@ -5,6 +5,7 @@ import {
   canManageDeletedCustomers,
   getRoleAccess,
 } from '../src/utils/accessRules'
+import { buildHistoricalUserStats } from '../src/utils/dashboardUserHistory'
 
 describe('Sprint 1 test setup', () => {
   it('runs the Vitest suite without touching live customer data', () => {
@@ -74,6 +75,50 @@ describe('Sprint 2 rights matrix', () => {
       deleteCustomer: false,
       viewAdmin: true,
       manageDeletedCustomers: true,
+    })
+  })
+})
+
+describe('Dashboard historical active users', () => {
+  const users = [
+    { userId: 'u-2010', user_type: 'USER', record_status: 'ACTIVE' },
+    { userId: 'u-2011', user_type: 'USER', record_status: 'ACTIVE' },
+    { userId: 'admin-2011', user_type: 'ADMIN', record_status: 'ACTIVE' },
+    { userId: 'pending-2011', user_type: 'USER', record_status: 'INACTIVE' },
+  ]
+
+  const auditLogs = [
+    {
+      action: 'Activated user account',
+      entity_type: 'user',
+      entity_id: 'u-2011',
+      created_at: '2011-04-10T08:30:00.000Z',
+    },
+    {
+      action: 'Activated user account',
+      entity_type: 'user',
+      entity_id: 'admin-2011',
+      created_at: '2011-06-12T08:30:00.000Z',
+    },
+  ]
+
+  it('carries the latest active user total forward when later years have no additions', () => {
+    expect(buildHistoricalUserStats({ users, auditLogs, selectedYear: 2010 })).toMatchObject({
+      activeStaff: 1,
+      activeAdmins: 0,
+      activeUsersTotal: 1,
+    })
+
+    expect(buildHistoricalUserStats({ users, auditLogs, selectedYear: 2011 })).toMatchObject({
+      activeStaff: 2,
+      activeAdmins: 1,
+      activeUsersTotal: 3,
+    })
+
+    expect(buildHistoricalUserStats({ users, auditLogs, selectedYear: 2026 })).toMatchObject({
+      activeStaff: 2,
+      activeAdmins: 1,
+      activeUsersTotal: 3,
     })
   })
 })

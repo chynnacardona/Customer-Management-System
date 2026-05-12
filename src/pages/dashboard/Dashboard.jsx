@@ -33,6 +33,7 @@ import { customerService } from '../../services/customerService'
 import { getAuditLogs } from '../../services/auditLogService'
 import { getSales } from '../../services/salesProductApi'
 import { useCurrencyFormatter } from '../../utils/currency'
+import { buildHistoricalUserStats } from '../../utils/dashboardUserHistory'
 import { buildActorSnapshot } from '../../utils/stampAudit'
 import { supabase } from '../../supabase/supabaseClient'
 import './Dashboard.css'
@@ -163,7 +164,7 @@ function Dashboard() {
           const [usersResult, deletedResult, auditResult] = await Promise.allSettled([
             supabase.from('user').select('userId, email, full_name, user_type, record_status').order('userId'),
             customerService.getDeletedCustomers(),
-            getAuditLogs(8),
+            getAuditLogs(500),
           ])
 
           if (usersResult.status === 'fulfilled') setUserRows(usersResult.value.data || [])
@@ -371,19 +372,22 @@ function Dashboard() {
 
   const adminStats = useMemo(() => {
     const users = userRows || []
-    const activeStaff = users.filter((u) => String(u.user_type).toUpperCase() === 'USER' && String(u.record_status).toUpperCase() === 'ACTIVE').length
+    const historicalStats = buildHistoricalUserStats({
+      users,
+      auditLogs: privilegedActivity,
+      selectedYear: safeYear,
+    })
     const pendingUsers = users.filter((u) => String(u.user_type).toUpperCase() === 'USER' && String(u.record_status).toUpperCase() !== 'ACTIVE').length
-    const activeAdmins = users.filter((u) => String(u.user_type).toUpperCase() === 'ADMIN' && String(u.record_status).toUpperCase() === 'ACTIVE').length
 
     return {
-      activeStaff,
+      activeStaff: historicalStats.activeStaff,
       pendingUsers,
-      activeAdmins,
+      activeAdmins: historicalStats.activeAdmins,
       deletedCustomers: deletedCustomers.length,
       totalUsers: users.length,
       superAdmins: users.filter((u) => String(u.user_type).toUpperCase() === 'SUPERADMIN').length,
     }
-  }, [userRows, deletedCustomers])
+  }, [userRows, deletedCustomers, privilegedActivity, safeYear])
 
   const superOverview = useMemo(() => {
     const openAlerts = [
@@ -394,10 +398,14 @@ function Dashboard() {
     return {
       systemHealth: error ? 'Attention' : 'Healthy',
       openAlerts,
-      recentLogins: (userRows || []).filter((u) => String(u.record_status).toUpperCase() === 'ACTIVE').length,
+      recentLogins: buildHistoricalUserStats({
+        users: userRows || [],
+        auditLogs: privilegedActivity,
+        selectedYear: safeYear,
+      }).activeUsersTotal,
       totalRolesTracked: 3,
     }
-  }, [error, userRows, adminStats.pendingUsers, auditNotice])
+  }, [error, userRows, privilegedActivity, safeYear, adminStats.pendingUsers, auditNotice])
 
   const pendingActivationRows = useMemo(() => {
     return (userRows || [])
