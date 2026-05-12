@@ -22,10 +22,13 @@ export const AuthProvider = ({ children }) => {
   }, [showAuthNotice]);
 
   const handleLogin = async (emailInput) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email: emailInput,
-      options: { emailRedirectTo: 'http://localhost:5173/auth/callback' },
-    });
+  const { error } = await supabase.auth.signInWithOtp({
+    email: emailInput,
+    options: { 
+      // DYNAMIC REDIRECT: This uses the actual URL of the site you are on
+      emailRedirectTo: `${window.location.origin}/auth/callback` 
+    },
+  });
     if (error) {
       showAuthNotice({
         tone: 'error',
