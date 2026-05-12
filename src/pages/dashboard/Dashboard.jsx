@@ -83,6 +83,26 @@ const parseSalesAmount = (row) => {
   return 0
 }
 
+const parseStampCreationYear = (stamp) => {
+  if (!stamp || stamp === '-') return null
+
+  const creationEntry = String(stamp)
+    .split(';')
+    .find((entry) => entry.split(':')[4] === 'C')
+
+  if (!creationEntry) return null
+
+  const [datePart] = creationEntry.split(':')
+  const dateSegments = String(datePart || '').split('/')
+  const explicitYear = Number(dateSegments[2])
+
+  if (Number.isFinite(explicitYear)) {
+    return explicitYear < 100 ? 2000 + explicitYear : explicitYear
+  }
+
+  return new Date().getFullYear()
+}
+
 const downloadCsv = (filename, headers, rows) => {
   const safe = (value) => {
     const text = String(value ?? '')
@@ -215,6 +235,21 @@ function Dashboard() {
     })
   }, [sales, rangeStart, rangeEnd, customerMap, paytermFilter])
 
+  const salesYearsByCustomer = useMemo(() => {
+    const map = new Map()
+
+    for (const row of sales) {
+      const date = new Date(row.salesdate)
+      if (Number.isNaN(date.getTime()) || !row.custno) continue
+
+      const yearSet = map.get(row.custno) || new Set()
+      yearSet.add(date.getFullYear())
+      map.set(row.custno, yearSet)
+    }
+
+    return map
+  }, [sales])
+
   const lineChartData = useMemo(() => {
     const bucket = new Map()
     if (viewBy === 'MONTH') {
@@ -270,11 +305,16 @@ function Dashboard() {
 
   const dashboardCustomers = useMemo(() => {
     const currentYear = new Date().getFullYear()
-    if (safeYear >= currentYear) return filteredCustomers
 
-    const customersWithSalesInYear = new Set(filteredSales.map((row) => row.custno).filter(Boolean))
-    return filteredCustomers.filter((customer) => customersWithSalesInYear.has(customer.custno))
-  }, [filteredCustomers, filteredSales, safeYear])
+    return filteredCustomers.filter((customer) => {
+      if (safeYear >= currentYear) return true
+
+      const createdYear = parseStampCreationYear(customer.stamp)
+      if (createdYear === safeYear) return true
+
+      return salesYearsByCustomer.get(customer.custno)?.has(safeYear)
+    })
+  }, [filteredCustomers, safeYear, salesYearsByCustomer])
 
   const dashboardCustomerCount = dashboardCustomers.length
 
