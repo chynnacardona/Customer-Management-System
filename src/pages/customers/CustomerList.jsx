@@ -41,7 +41,7 @@ function CustomerListPage() {
   const canSeeAuditHistory = isSuperAdmin || isAdmin
   const canRecoverDeletedRecords = isSuperAdmin || isAdmin
   const canAddCustomer = canAddCustomerByRights(rights)
-  const canEditCustomer = canEditCustomerByRights(rights) && (isSuperAdmin || isAdmin)
+  const canEditCustomer = isSuperAdmin || isAdmin || canEditCustomerByRights(rights)
   const canDeleteCustomer = isSuperAdmin 
   const canShowCustomerActions = canEditCustomer || canDeleteCustomer
 
